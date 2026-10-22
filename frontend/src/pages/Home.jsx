@@ -7,7 +7,7 @@ import { ApproachStrip } from "@/components/home/ApproachStrip";
 export default function Home() {
   useSeo({
     title: "Sports Social Media & Content Creator",
-    description: "Alex Cearnau (Mativo Hub): sports social media, football content creation and sports storytelling concepts. Open to junior roles, internships and collaborations.",
+    description: "Alex Cearnau: sports social media, football content creation and sports storytelling concepts. Open to junior roles, internships and collaborations.",
     path: "/",
   });
   return (

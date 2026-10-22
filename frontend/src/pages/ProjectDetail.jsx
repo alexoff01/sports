@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Info } from "lucide-react";
 import { useSeo } from "@/lib/seo";
-import { responsive } from "@/lib/api";
+import { Picture } from "@/components/site/Picture";
 import { useProject } from "@/hooks/useProjects";
 import { MaskedHeadline } from "@/components/site/MaskedHeadline";
 import { Reveal } from "@/components/site/Reveal";
@@ -44,7 +44,7 @@ const DetailHero = ({ p }) => (
     </div>
     <Reveal delay={0.2} className="container-x mt-12">
       <div className="relative aspect-[16/10] overflow-hidden border border-line md:aspect-[21/9] [clip-path:polygon(0_0,100%_0,100%_100%,6%_100%,0_88%)]">
-        <img {...responsive(p.cover_image)} alt={p.cover_alt} className="h-full w-full object-cover" />
+        <Picture src={p.cover_image} sizes="100vw" alt={p.cover_alt} className="h-full w-full object-cover object-center" />
       </div>
     </Reveal>
   </section>

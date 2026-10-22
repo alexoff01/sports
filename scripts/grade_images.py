@@ -1,46 +1,43 @@
-"""Downloads royalty-free stock photos once and applies one consistent night-match grade."""
-import io
+"""Applies one shared colour grade to the AI-generated source images and exports AVIF/WebP/JPEG sizes."""
+import json
+import os
+import random
 from pathlib import Path
 
-import requests
-from PIL import Image, ImageEnhance, ImageOps
+from PIL import Image, ImageChops, ImageEnhance
 
+RAW = Path(os.environ.get("RAW_DIR", "/app/scripts/raw"))
 OUT = Path("/app/frontend/public/images")
+MANIFEST = Path("/app/frontend/src/lib/imageManifest.json")
 OUT.mkdir(parents=True, exist_ok=True)
 
-U = "https://images.unsplash.com/photo-{}?auto=format&fit=crop&w=2000&q=85"
-P = "https://images.pexels.com/photos/{0}/pexels-photo-{0}.jpeg?auto=compress&cs=tinysrgb&w=2000"
 
-SOURCES = {
-    "stadium-night": U.format("1679391029864-d46f366a456b"),
-    "floodlight-pitch": U.format("1431324155629-1a6deb1dec8d"),
-    "stadium-aerial": P.format("35898730"),
-    "fans-night": U.format("1706675780107-7c43cc487928"),
-    "fans-crowd": U.format("1665413811870-5b29a250f64a"),
-    "fan-shirt": U.format("1556816214-fda351e4a7fb"),
-    "phone-filming": U.format("1509473383868-b934025a9bc3"),
-    "phone-crowd": U.format("1779809140695-9312654f0090"),
-    "gimbal-creator": U.format("1651471086771-6c529f276dac"),
-    "ball-night": P.format("38105639"),
-    "ball-goal-floodlight": P.format("16826135"),
-    "ball-line": U.format("1599204606395-ede983387d21"),
-}
+def grain(size, strength=7):
+    random.seed(7)
+    noise = Image.effect_noise(size, 40).point(lambda v: 128 + (v - 128) * strength // 40)
+    return Image.merge("RGB", (noise, noise, noise))
 
 
 def grade(img: Image.Image) -> Image.Image:
-    img = ImageOps.exif_transpose(img).convert("RGB")
-    img = ImageEnhance.Color(img).enhance(0.72)
-    img = ImageEnhance.Contrast(img).enhance(1.12)
-    img = ImageEnhance.Brightness(img).enhance(0.82)
-    tint = Image.new("RGB", img.size, (8, 22, 70))
-    return Image.blend(img, tint, 0.16)
+    img = img.convert("RGB")
+    img = ImageEnhance.Color(img).enhance(0.86)
+    img = ImageEnhance.Contrast(img).enhance(1.06)
+    r, g, b = img.split()
+    img = Image.merge("RGB", (r.point(lambda v: int(v * 0.94)), g, b.point(lambda v: min(255, int(v * 1.04 + 3)))))
+    img = Image.blend(img, Image.new("RGB", img.size, (6, 14, 44)), 0.08)
+    return ImageChops.add(img, grain(img.size), 1.0, -128)
 
 
-for name, url in SOURCES.items():
-    data = requests.get(url, timeout=60).content
-    img = grade(Image.open(io.BytesIO(data)))
-    for width in (1600, 800):
-        copy = img.copy()
-        copy.thumbnail((width, width * 2))
-        copy.save(OUT / f"{name}-{width}.webp", "WEBP", quality=74, method=6)
-    print("ok", name, img.size)
+manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
+for src in sorted(RAW.glob("*.jpg")):
+    name = src.stem
+    img = grade(Image.open(src))
+    manifest[name] = {"w": img.width, "h": img.height}
+    for suffix, scale in (("lg", 1), ("sm", 0.5)):
+        copy = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
+        copy.save(OUT / f"{name}-{suffix}.avif", "AVIF", quality=58)
+        copy.save(OUT / f"{name}-{suffix}.webp", "WEBP", quality=74, method=6)
+        copy.save(OUT / f"{name}-{suffix}.jpg", "JPEG", quality=78, progressive=True, optimize=True)
+    print(name, img.size)
+
+MANIFEST.write_text(json.dumps(manifest, indent=2))

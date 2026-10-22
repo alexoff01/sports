@@ -1,0 +1,66 @@
+{
+  "about-creator": {
+    "w": 848,
+    "h": 1264
+  },
+  "approach-seats": {
+    "w": 848,
+    "h": 1264
+  },
+  "band-grass-lines": {
+    "w": 1264,
+    "h": 848
+  },
+  "contact-net": {
+    "w": 1264,
+    "h": 848
+  },
+  "cover-ball-backlit": {
+    "w": 1264,
+    "h": 848
+  },
+  "cover-boots-floodlight": {
+    "w": 1264,
+    "h": 848
+  },
+  "cover-dressing-room": {
+    "w": 1264,
+    "h": 848
+  },
+  "cover-scarf": {
+    "w": 1264,
+    "h": 848
+  },
+  "cover-stadium-bluehour": {
+    "w": 1264,
+    "h": 848
+  },
+  "cover-touchline-rig": {
+    "w": 1264,
+    "h": 848
+  },
+  "gallery-corner-flag": {
+    "w": 1264,
+    "h": 848
+  },
+  "gallery-floodlight-tower": {
+    "w": 1264,
+    "h": 848
+  },
+  "gallery-stadium-exterior": {
+    "w": 1264,
+    "h": 848
+  },
+  "gallery-tunnel": {
+    "w": 1264,
+    "h": 848
+  },
+  "hero-phone": {
+    "w": 848,
+    "h": 1264
+  },
+  "hero-stadium": {
+    "w": 1264,
+    "h": 848
+  }
+}

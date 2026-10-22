@@ -1,7 +1,7 @@
 import { Award, BarChart3, Brush, CalendarRange, Clapperboard, MessagesSquare, Smartphone } from "lucide-react";
 import { useSeo } from "@/lib/seo";
 import { SITE } from "@/config/site";
-import { responsive } from "@/lib/api";
+import { Picture } from "@/components/site/Picture";
 import { MaskedHeadline } from "@/components/site/MaskedHeadline";
 import { Reveal } from "@/components/site/Reveal";
 import { CtaLink } from "@/components/site/CtaLink";
@@ -31,14 +31,14 @@ const AboutHero = () => (
       <Reveal delay={0.45}>
         <div className="mt-10 max-w-xl space-y-5">
           <p className="lead">I'm Alex Cearnau, a football fan from Oradea, Romania, building a career in sports social media and digital content.</p>
-          <p className="body-copy">Through Mativo Hub, my personal creative space, I plan concept campaigns, matchday content and short-form video to practise how clubs and athletes can tell better stories online. I'm looking for a junior role, internship or collaboration where I can learn from a professional team and contribute from day one.</p>
+          <p className="body-copy">Through my own concept projects, I plan campaigns, matchday content and short-form video to practise how clubs and athletes can tell better stories online. I'm looking for a junior role, internship or collaboration where I can learn from a professional team and contribute from day one.</p>
         </div>
         <div className="mt-10"><CtaLink to="/contact" testId="about-hero-contact-btn">Work with me</CtaLink></div>
       </Reveal>
     </div>
     <Reveal delay={0.3} className="lg:col-span-5">
       <div className="relative aspect-[4/5] overflow-hidden border border-line [clip-path:polygon(12%_0,100%_0,100%_100%,0_100%,0_10%)]">
-        <img {...responsive("/images/gimbal-creator-1600.webp", "(min-width:1024px) 40vw, 100vw")} alt="A content creator films on a gimbal at the edge of a pitch" className="h-full w-full object-cover" />
+        <Picture src="/images/about-creator-lg.webp" sizes="(min-width:1024px) 40vw, 100vw" alt="Back view of a creator filming a floodlit pitch with a camera on a gimbal" className="h-full w-full object-cover object-[center_35%]" />
       </div>
     </Reveal>
   </section>
@@ -95,7 +95,7 @@ const Skills = () => (
 
 const QuoteBand = () => (
   <section className="relative overflow-hidden border-y border-line" aria-label="Statement" data-testid="quote-band">
-    <img {...responsive("/images/floodlight-pitch-1600.webp")} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+    <Picture src="/images/band-grass-lines-lg.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-bottom opacity-40" />
     <div className="absolute inset-0 bg-ink-950/70" aria-hidden="true" />
     <Reveal className="container-x relative py-28 md:py-36">
       <p className="max-w-5xl font-display text-[clamp(2rem,5vw,4.25rem)] font-bold uppercase leading-[1] text-paper">{SITE.quote}</p>

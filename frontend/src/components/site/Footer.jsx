@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { NAV, SITE } from "@/config/site";
-import { LogoMark } from "@/components/site/Logo";
+import { Logo } from "@/components/site/Logo";
 import { ObfuscatedEmail } from "@/components/site/ObfuscatedEmail";
 import { SocialLinks } from "@/components/site/SocialLinks";
 import { useConsent } from "@/components/site/ConsentProvider";
@@ -14,10 +14,7 @@ export const Footer = () => {
     <footer data-testid="site-footer" className="relative border-t border-line bg-ink-950">
       <div className="container-x grid gap-12 py-16 md:grid-cols-12">
         <div className="md:col-span-5">
-          <div className="flex items-center gap-3">
-            <LogoMark className="h-10 w-10" />
-            <p className="font-display text-2xl font-extrabold uppercase tracking-[0.1em]">Mativo Hub</p>
-          </div>
+          <Logo height="h-8" testId="footer-logo-link" />
           <p className="body-copy mt-5 max-w-sm">
             Alex Cearnau. Sports social media, football content creation and sports storytelling. {SITE.availability}.
           </p>
@@ -51,7 +48,7 @@ export const Footer = () => {
         <div className="container-x flex flex-col gap-3 py-8 text-xs leading-relaxed text-slate-400 md:flex-row md:justify-between">
           <p data-testid="footer-copyright">© {year} Alex Cearnau. All rights reserved.</p>
           <div className="max-w-2xl space-y-1 md:text-right">
-            <p>Photography: royalty-free images from Unsplash and Pexels, colour-graded for this site. Project mockups are original concept work; clubs and brands in concepts are fictional.</p>
+            <p>Images: AI-generated atmospheric visuals created for this site; they do not depict real matches, clubs or players. Project mockups are original concept work; clubs and brands in concepts are fictional.</p>
             <p data-testid="footer-affiliation-note">Not affiliated with or endorsed by FC Barcelona or any club mentioned.</p>
           </div>
         </div>

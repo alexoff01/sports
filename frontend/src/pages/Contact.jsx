@@ -6,7 +6,7 @@ import { Reveal } from "@/components/site/Reveal";
 import { ObfuscatedEmail } from "@/components/site/ObfuscatedEmail";
 import { SocialLinks } from "@/components/site/SocialLinks";
 import { ContactForm } from "@/components/contact/ContactForm";
-import { responsive } from "@/lib/api";
+import { Picture } from "@/components/site/Picture";
 
 export default function Contact() {
   useSeo({
@@ -39,7 +39,7 @@ export default function Contact() {
               </p>
             </div>
             <div className="relative hidden aspect-[4/3] overflow-hidden border border-line sm:block [clip-path:polygon(0_0,100%_0,100%_86%,88%_100%,0_100%)]">
-              <img {...responsive("/images/ball-night-1600.webp", "(min-width:1024px) 30vw, 100vw")} alt="A football on dewy grass at night" loading="lazy" className="h-full w-full object-cover" />
+              <Picture src="/images/contact-net-lg.webp" sizes="(min-width:1024px) 30vw, 100vw" alt="Close-up of a goal net and post with blue floodlight bokeh behind" className="h-full w-full object-cover object-center" />
             </div>
           </Reveal>
         </div>

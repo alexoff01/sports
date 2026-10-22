@@ -51,7 +51,7 @@ export const ProjectEditor = ({ project, onClose }) => {
     }
   };
 
-  const preview = { ...form, id: "preview", tags: tagText.split(",").map((t) => t.trim()).filter(Boolean), cover_image: form.cover_image || "/images/stadium-night-1600.webp" };
+  const preview = { ...form, id: "preview", tags: tagText.split(",").map((t) => t.trim()).filter(Boolean), cover_image: form.cover_image || "/images/hero-stadium-lg.webp" };
 
   return (
     <div data-testid="project-editor">

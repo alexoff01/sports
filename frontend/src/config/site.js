@@ -4,7 +4,6 @@ const TODO_CONFIRM = "TODO_CONFIRM";
 
 export const SITE = {
   person: "Alex Cearnau",
-  brand: "Mativo Hub",
   tagline: "Sports Lover. Digital Creator.",
   url: process.env.REACT_APP_SITE_URL,
   city: "Oradea, Romania",

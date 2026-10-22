@@ -216,7 +216,7 @@ async def upload(request: Request, file: UploadFile = File(...), _: str = Depend
     except Exception:  # noqa: BLE001
         raise HTTPException(status_code=415, detail="The image could not be processed.")
     media_id = str(uuid.uuid4())
-    path = await asyncio.to_thread(_put, f"mativo/media/{media_id}.webp", processed, "image/webp")
+    path = await asyncio.to_thread(_put, f"portfolio/media/{media_id}.webp", processed, "image/webp")
     await db.media.insert_one(
         {"id": media_id, "path": path, "width": width, "height": height, "size": len(processed), "created_at": now()}
     )

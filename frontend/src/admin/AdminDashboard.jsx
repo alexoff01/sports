@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
-import { LogoMark } from "@/components/site/Logo";
+import { Logo } from "@/components/site/Logo";
 import { ProjectList } from "@/admin/ProjectList";
 import { ProjectEditor } from "@/admin/ProjectEditor";
 import { MessagesPanel } from "@/admin/MessagesPanel";
@@ -35,7 +35,7 @@ export const AdminDashboard = ({ email, onLogout }) => {
     <div data-testid="admin-dashboard">
       <header className="sticky top-0 z-40 border-b border-line bg-ink-950/90 backdrop-blur-xl">
         <div className="container-x flex min-h-[68px] flex-wrap items-center justify-between gap-3 py-2">
-          <div className="flex items-center gap-3"><LogoMark className="h-8 w-8" /><span className="font-display text-xl font-extrabold uppercase tracking-[0.1em]">Studio</span></div>
+          <Logo height="h-9" testId="admin-dashboard-logo-link" />
           <nav className="flex" aria-label="Studio sections">
             {["projects", "inbox"].map((t) => (
               <button key={t} type="button" onClick={() => setView({ tab: t, editing: null })} className={`${TAB} ${view.tab === t ? "border-volt text-white" : "border-transparent text-slate-400 hover:text-white"}`} data-testid={`admin-tab-${t}`}>{t}</button>

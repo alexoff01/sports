@@ -12,14 +12,6 @@ export const hasBackend = Boolean(BASE);
 
 export const mediaUrl = (src) => (src?.startsWith("/api/") ? `${BASE ?? ""}${src}` : src);
 
-export const responsive = (src, sizes = "100vw") => {
-  if (src && /-1600\.webp$/.test(src)) {
-    const base = src.replace(/-1600\.webp$/, "");
-    return { src, srcSet: `${base}-800.webp 800w, ${base}-1600.webp 1600w`, sizes };
-  }
-  return { src: mediaUrl(src) };
-};
-
 export const errorMessage = (err, fallback = "Something went wrong. Please try again.") => {
   const detail = err?.response?.data?.detail;
   if (typeof detail === "string") return detail;

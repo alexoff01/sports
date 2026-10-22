@@ -1,25 +1,38 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { getLenis } from "@/components/site/SmoothScroll";
 
-export const LogoMark = ({ className = "h-8 w-8" }) => (
-  <svg viewBox="0 0 32 32" className={className} aria-hidden="true" focusable="false">
-    <rect x="1" y="1" width="30" height="30" rx="2" fill="#05070D" stroke="#2F6BFF" strokeWidth="2" />
-    <path d="M8 23V9.5l8 8 8-8V23" fill="none" stroke="#F8FAFC" strokeWidth="3" strokeLinecap="square" />
-    <circle cx="16" cy="24.5" r="2.2" fill="#2F6BFF" />
-  </svg>
-);
+export const Logo = ({ onNavigate, height = "h-10", testId = "header-logo-link" }) => {
+  const { pathname } = useLocation();
 
-export const Logo = ({ onClick }) => (
-  <Link
-    to="/"
-    onClick={onClick}
-    data-testid="header-logo-link"
-    aria-label="Alex Cearnau, Mativo Hub — home"
-    className="group inline-flex min-h-[44px] items-center gap-3"
-  >
-    <LogoMark className="h-9 w-9 transition-transform duration-500 ease-cine group-hover:rotate-[-8deg]" />
-    <span className="flex flex-col leading-none">
-      <span className="font-display text-xl font-extrabold uppercase tracking-[0.08em]">Mativo</span>
-      <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.32em] text-slate-400">Alex Cearnau</span>
-    </span>
-  </Link>
-);
+  const onClick = (e) => {
+    onNavigate?.();
+    if (pathname !== "/") return;
+    e.preventDefault();
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Wait one tick so a closing mobile menu can release the scroll lock first.
+    setTimeout(() => {
+      const lenis = getLenis();
+      if (lenis) lenis.scrollTo(0, { immediate: reduce, force: true });
+      else window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    }, 60);
+  };
+
+  return (
+    <Link
+      to="/"
+      onClick={onClick}
+      aria-label="Alex Cearnau – Home"
+      data-testid={testId}
+      className="inline-flex min-h-[44px] shrink-0 items-center rounded-sm transition-opacity duration-300 hover:opacity-90 focus-visible:opacity-90"
+    >
+      <img
+        src="/brand/logo-80.png"
+        srcSet="/brand/logo-40.png 1x, /brand/logo-80.png 2x, /brand/logo-120.png 3x"
+        width={60}
+        height={40}
+        alt="Alex Cearnau logo"
+        className={`${height} w-auto`}
+      />
+    </Link>
+  );
+};

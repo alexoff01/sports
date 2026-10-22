@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
-import { responsive } from "@/lib/api";
+import { Picture } from "@/components/site/Picture";
 
 export const TypeBadge = ({ type, label }) => (
   <span
@@ -14,12 +14,11 @@ export const TypeBadge = ({ type, label }) => (
 
 const Frame = ({ project, sizes, className }) => (
   <div className={`relative overflow-hidden bg-ink-900 ${className}`}>
-    <img
-      {...responsive(project.cover_image, sizes)}
+    <Picture
+      src={project.cover_image}
+      sizes={sizes}
       alt={project.cover_alt}
-      loading="lazy"
-      decoding="async"
-      className="h-full w-full object-cover transition-transform duration-1000 ease-cine group-hover:scale-[1.07]"
+      className="h-full w-full object-cover object-center transition-transform duration-1000 ease-cine group-hover:scale-[1.07]"
     />
     <div className="absolute left-4 top-4 flex flex-wrap gap-2">
       <span className="tag border-transparent bg-volt text-white">{project.category}</span>

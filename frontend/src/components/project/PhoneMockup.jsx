@@ -1,10 +1,10 @@
-import { responsive } from "@/lib/api";
+import { Picture } from "@/components/site/Picture";
 
 export const PhoneMockup = ({ image, alt, platform, caption, index }) => (
   <figure className="group" data-testid={`content-mockup-${index}`}>
     <div className="relative mx-auto aspect-[9/18] w-full max-w-[280px] overflow-hidden rounded-[24px] border border-line-strong bg-ink-900 p-2 transition-transform duration-700 ease-cine group-hover:-translate-y-2">
       <div className="relative h-full overflow-hidden rounded-[18px]">
-        <img {...responsive(image, "280px")} alt={alt} loading="lazy" className="h-full w-full object-cover" />
+        <Picture src={image} sizes="280px" alt={alt} className="h-full w-full object-cover object-center" />
         <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
           <span className="bg-ink-950/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] backdrop-blur">{platform}</span>
           <span className="text-[10px] uppercase tracking-[0.16em] text-slate-200">Mockup</span>

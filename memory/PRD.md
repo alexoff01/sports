@@ -1,7 +1,7 @@
-# PRD — Alex Cearnau Sports Social Media Portfolio (Mativo Hub)
+# PRD — Alex Cearnau Sports Social Media Portfolio
 
 ## Original problem statement
-Build a complete, production-ready portfolio / business-card website for Alex Cearnau, an aspiring sports social media and digital marketing professional (brand: Mativo / Mativo Hub). Positioning: "Sports Lover. Digital Creator." Portfolio and digital business card ONLY (no shop, cart, pricing, payments, visitor accounts, newsletters, comments). Single conversion: collaboration/job inquiry via Contact. Pages: Home · Projects (+ /projects/[slug] case studies: Context → Objective → Strategy → Creative Execution → Intended Outcome) · About Me · Contact, plus Privacy Policy and Cookie Policy. Never invent clients, results, stats. Qualification: "Social Media in Sports, FC Barcelona Innovation Hub, 2025" + non-affiliation note. Confirmed email alexmcearnau@gmail.com (obfuscated). Socials TODO_CONFIRM, not rendered. Premium cinematic black/navy + electric blue design, purposeful motion, reduced-motion support. GDPR cookie banner with equal Accept/Reject/Customize. Hidden admin with mandatory TOTP MFA, server-side authz, secure uploads. Strong security headers, rate limiting, honeypot, SEO, accessibility. (Full brief in the first conversation message.)
+Build a complete, production-ready portfolio / business-card website for Alex Cearnau, an aspiring sports social media and digital marketing professional (original brand name later removed at the owner's request). Positioning: "Sports Lover. Digital Creator." Portfolio and digital business card ONLY (no shop, cart, pricing, payments, visitor accounts, newsletters, comments). Single conversion: collaboration/job inquiry via Contact. Pages: Home · Projects (+ /projects/[slug] case studies: Context → Objective → Strategy → Creative Execution → Intended Outcome) · About Me · Contact, plus Privacy Policy and Cookie Policy. Never invent clients, results, stats. Qualification: "Social Media in Sports, FC Barcelona Innovation Hub, 2025" + non-affiliation note. Confirmed email alexmcearnau@gmail.com (obfuscated). Socials TODO_CONFIRM, not rendered. Premium cinematic black/navy + electric blue design, purposeful motion, reduced-motion support. GDPR cookie banner with equal Accept/Reject/Customize. Hidden admin with mandatory TOTP MFA, server-side authz, secure uploads. Strong security headers, rate limiting, honeypot, SEO, accessibility. (Full brief in the first conversation message.)
 
 ## User choices
 - Keep React + FastAPI + MongoDB stack (instead of Next.js + Supabase)
@@ -23,6 +23,12 @@ Build a complete, production-ready portfolio / business-card website for Alex Ce
 - Contact form: zod + server validation, honeypot, rate limit, Origin check, email delivery + stored inbox
 - Admin: login + TOTP enrol/verify, sessions, lockout, idle logout, project CRUD/reorder/publish, uploads with magic-byte check + EXIF strip, inbox
 - SEO: meta per page, canonical, OG/Twitter, JSON-LD Person/WebSite, sitemap.xml, robots.txt, favicon set
+
+## Implemented (2026-10-22, change request 2)
+- Removed all previous brand references site-wide (code, meta, JSON-LD, email from-name, TOTP issuer, storage path, docs)
+- Owner logo (public/brand/logo.png, unchanged) in header, footer, intro, admin login/dashboard; logo-only (no name text); every instance is a router Link to Home (smooth scroll to top on Home, closes mobile menu)
+- Favicons/app icons (16/32/180/192/512 + ico) and OG image generated from the logo
+- 16 AI-generated, uniformly graded images (AVIF/WebP/JPEG, sm/lg, width/height, picture element); old stock images removed; seed data + DB paths updated; docs/image-credits.md
 
 ## Backlog
 - P0: Fill TODO_CONFIRM items (socials, quote, legal details, production domain, portrait)

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
-import { LogoMark } from "@/components/site/Logo";
+import { Logo } from "@/components/site/Logo";
 
 const BTN = "inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-sm border border-volt bg-volt px-6 font-display text-base font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-volt-bright disabled:opacity-60";
 
@@ -47,7 +47,7 @@ export const AdminLogin = ({ onSuccess }) => {
   return (
     <main className="grid min-h-screen place-items-center px-5 py-16">
       <div className="w-full max-w-md border border-line bg-ink-900 p-8" data-testid="admin-login-card">
-        <div className="flex items-center gap-3"><LogoMark className="h-9 w-9" /><h1 className="font-display text-2xl font-extrabold uppercase tracking-[0.08em]">Studio sign in</h1></div>
+        <div className="flex flex-col items-start gap-5"><Logo height="h-10" testId="admin-login-logo-link" /><h1 className="font-display text-2xl font-extrabold uppercase tracking-[0.08em]">Studio sign in</h1></div>
         {step === "credentials" ? (
           <form onSubmit={submitCredentials} className="mt-8 space-y-5" data-testid="admin-credentials-form">
             <div><label htmlFor="a-email" className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Email</label><input id="a-email" type="email" autoComplete="username" required className="field" value={form.email} onChange={set("email")} data-testid="admin-email-input" /></div>

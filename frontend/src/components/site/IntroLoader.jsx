@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { LogoMark } from "@/components/site/Logo";
+import { Logo } from "@/components/site/Logo";
 import { FIRST_VISIT } from "@/lib/intro";
 
 export const IntroLoader = () => {
@@ -31,9 +31,8 @@ export const IntroLoader = () => {
           className="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-ink-950"
           exit={{ opacity: 0, transition: { duration: 0.35 } }}
         >
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="flex items-center gap-4">
-            <LogoMark className="h-12 w-12" />
-            <span className="font-display text-3xl font-extrabold uppercase tracking-[0.2em]">Mativo</span>
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} onClick={(e) => e.stopPropagation()}>
+            <Logo height="h-14" testId="intro-logo-link" onNavigate={() => setShow(false)} />
           </motion.div>
           <div className="mt-8 h-px w-56 overflow-hidden bg-line">
             <motion.div className="h-full origin-left bg-volt" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.95, ease: [0.76, 0, 0.24, 1] }} />

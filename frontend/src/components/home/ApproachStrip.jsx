@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { Camera, Clapperboard, Compass, Users } from "lucide-react";
 import { Reveal } from "@/components/site/Reveal";
-import { responsive } from "@/lib/api";
+import { Picture } from "@/components/site/Picture";
 
 const ITEMS = [
   { icon: Camera, title: "Content Creation", text: "Matchday photos, stories and graphics planned around the moments supporters care about most." },
@@ -31,7 +31,7 @@ export const ApproachStrip = () => {
             <p className="lead mt-6 max-w-md">Every idea starts with the sport and the people around it, then gets a plan and a format that fits the platform.</p>
           </Reveal>
           <Reveal delay={0.2} className="relative mt-10 aspect-[4/5] overflow-hidden border border-line [clip-path:polygon(0_0,100%_0,100%_88%,86%_100%,0_100%)]">
-            <motion.img style={{ y }} {...responsive("/images/phone-crowd-1600.webp", "(min-width:1024px) 40vw, 100vw")} alt="A supporter raises a smartphone to film the match from the stands" loading="lazy" className="h-[116%] w-full -translate-y-[8%] object-cover" />
+            <Picture img={motion.img} style={{ y }} src="/images/approach-seats-lg.webp" sizes="(min-width:1024px) 40vw, 100vw" alt="Rows of empty navy stadium seats raked by floodlight, the glowing pitch at the edge of the frame" className="h-[116%] w-full -translate-y-[8%] object-cover object-center" />
           </Reveal>
         </div>
         <ul className="grid gap-px self-end border border-line bg-line sm:grid-cols-2 lg:col-span-7">

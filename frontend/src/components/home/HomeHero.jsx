@@ -3,7 +3,7 @@ import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTran
 import { MaskedHeadline } from "@/components/site/MaskedHeadline";
 import { CtaLink } from "@/components/site/CtaLink";
 import { HERO_DELAY } from "@/lib/intro";
-import { responsive } from "@/lib/api";
+import { Picture } from "@/components/site/Picture";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -11,7 +11,7 @@ const PhoneConcept = ({ rx, ry }) => (
   <motion.div style={{ rotateX: rx, rotateY: ry, transformPerspective: 1100 }} className="relative w-[260px] xl:w-[290px]">
     <div className="relative aspect-[9/19] overflow-hidden rounded-[26px] border border-line-strong bg-ink-900 p-2 shadow-[0_40px_120px_-30px_rgba(47,107,255,0.55)]">
       <div className="relative h-full overflow-hidden rounded-[20px]">
-        <img {...responsive("/images/phone-filming-1600.webp", "300px")} alt="" className="h-full w-full object-cover" />
+        <Picture src="/images/hero-phone-lg.webp" sizes="300px" alt="" className="h-full w-full object-cover object-center" />
         <div className="absolute inset-x-3 top-3 flex gap-1" aria-hidden="true">
           {[1, 1, 0.4, 0].map((v, i) => (
             <span key={i} className="h-[2px] flex-1 bg-white/30"><span className="block h-full bg-white" style={{ width: `${v * 100}%` }} /></span>
@@ -49,14 +49,15 @@ export const HomeHero = () => {
   return (
     <section ref={ref} onMouseMove={onMove} data-testid="home-hero" className="grain relative flex min-h-[100svh] items-end overflow-hidden" aria-labelledby="hero-title">
       <motion.div style={{ y: imageY }} className="absolute inset-0 h-[118%]">
-        <motion.img
-          {...responsive("/images/stadium-night-1600.webp")}
-          alt="Floodlit football stadium packed with supporters during a night match"
-          fetchPriority="high"
+        <Picture
+          img={motion.img}
+          src="/images/hero-stadium-lg.webp"
+          priority
+          alt="Empty football stadium at night seen from a high corner, floodlight beams falling on the pitch"
           initial={reduce ? false : { scale: 1.18 }}
           animate={{ scale: 1.04 }}
           transition={{ duration: 2.8, ease: EASE }}
-          className="h-full w-full object-cover object-center"
+          className="h-full w-full object-cover object-[60%_center]"
         />
       </motion.div>
       <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/70 to-ink-950/30" />
@@ -65,7 +66,7 @@ export const HomeHero = () => {
       <motion.div style={{ y: contentY }} className="container-x relative z-10 grid items-end gap-12 pb-16 pt-36 md:pb-24 lg:grid-cols-12">
         <div className="lg:col-span-9">
           <motion.p className="eyebrow" initial={reduce ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: HERO_DELAY, ease: EASE }}>
-            Alex Cearnau · Mativo Hub
+            Alex Cearnau · Sports Social Media
           </motion.p>
           <MaskedHeadline
             testId="hero-title"

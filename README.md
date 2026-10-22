@@ -1,4 +1,4 @@
-# Alex Cearnau — Sports Social Media Portfolio (Mativo Hub)
+# Alex Cearnau — Sports Social Media Portfolio
 
 Portfolio and digital business card. No shop, payments, accounts for visitors or newsletters. The only conversion is the contact form.
 
@@ -24,8 +24,9 @@ frontend/src/
   components/home, project, contact
   pages/          Home, Projects, ProjectDetail, About, Contact, PrivacyPolicy, CookiePolicy, NotFound
   admin/          lazy-loaded hidden studio (login, MFA, projects CRUD, inbox)
-frontend/public/images  graded WebP images (800/1600 widths), og-image.jpg, favicon.svg
-scripts/grade_images.py downloads stock photos and applies the shared colour grade
+frontend/public/images  graded AI-generated images (AVIF/WebP/JPEG, sm + lg), see docs/image-credits.md
+frontend/public/brand   owner-supplied logo (original + 40/80/120 px copies)
+scripts/grade_images.py applies the shared colour grade and exports all formats
 ```
 
 ## Environment variables
@@ -70,4 +71,3 @@ Deploy with Emergent (frontend + backend + MongoDB). Before launch follow the ch
 - Legal details in the Privacy/Cookie policies (postal address, processors, transfers, retention for hiring processes, hosting cookies)
 - Production domain in `sitemap.xml`, `robots.txt` and env files
 - Final images (a real portrait of Alex for About)
-- Description of Mativo Hub as "my personal creative space"

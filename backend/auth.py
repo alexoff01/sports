@@ -139,7 +139,7 @@ async def login(body: LoginIn, request: Request, response: Response):
         return {"step": "totp"}
     secret = admin.get("pending_totp") or pyotp.random_base32()
     await db.admins.update_one({"email": email}, {"$set": {"pending_totp": secret}})
-    uri = pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="Mativo Studio")
+    uri = pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="Alex Cearnau Studio")
     return {"step": "enroll", "qr": _qr_data_uri(uri), "secret": secret}
 
 

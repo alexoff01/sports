@@ -58,7 +58,7 @@ export const Header = () => {
       }`}
     >
       <div className="container-x flex h-[76px] items-center justify-between">
-        <Logo />
+        <Logo onNavigate={close} />
         <nav aria-label="Main" className="hidden items-center gap-9 lg:flex">
           {NAV.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.to === "/"} className={linkClass} data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
