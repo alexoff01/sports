@@ -4,6 +4,7 @@ import { MaskedHeadline } from "@/components/site/MaskedHeadline";
 import { CtaLink } from "@/components/site/CtaLink";
 import { HERO_DELAY } from "@/lib/intro";
 import { Picture } from "@/components/site/Picture";
+import { BallTrajectory } from "@/components/football/BallTrajectory";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -32,7 +33,6 @@ export const HomeHero = () => {
   const ref = useRef(null);
   const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const imageY = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "22%"]);
   const contentY = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "-12%"]);
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
@@ -48,20 +48,9 @@ export const HomeHero = () => {
 
   return (
     <section ref={ref} onMouseMove={onMove} data-testid="home-hero" className="grain relative flex min-h-[100svh] items-end overflow-hidden" aria-labelledby="hero-title">
-      <motion.div style={{ y: imageY }} className="absolute inset-0 h-[118%]">
-        <Picture
-          img={motion.img}
-          src="/images/hero-stadium-lg.webp"
-          priority
-          alt="Empty football stadium at night seen from a high corner, floodlight beams falling on the pitch"
-          initial={reduce ? false : { scale: 1.18 }}
-          animate={{ scale: 1.04 }}
-          transition={{ duration: 2.8, ease: EASE }}
-          className="h-full w-full object-cover object-[60%_center]"
-        />
-      </motion.div>
-      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/70 to-ink-950/30" />
-      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-ink-950/80 via-ink-950/20 to-transparent" />
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink-950/85 via-ink-950/25 to-transparent" />
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-ink-950/75 via-ink-950/15 to-transparent" />
+      <BallTrajectory delay={HERO_DELAY + 0.5} />
 
       <motion.div style={{ y: contentY }} className="container-x relative z-10 grid items-end gap-12 pb-16 pt-36 md:pb-24 lg:grid-cols-12">
         <div className="lg:col-span-9">

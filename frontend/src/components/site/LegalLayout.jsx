@@ -1,7 +1,12 @@
 import { SITE } from "@/config/site";
+import { DriftMotif, GlowHalo } from "@/components/football/Atmosphere";
+import { CornerFlagIcon, WhistleIcon } from "@/components/football/motifs";
 
 export const LegalLayout = ({ title, testId, intro, sections }) => (
-  <article className="container-x pb-section pt-40 md:pt-48" data-testid={testId}>
+  <article className="container-x relative pb-section pt-40 md:pt-48" data-testid={testId}>
+    <GlowHalo className="-left-40 top-16 h-[480px] w-[480px]" />
+    <DriftMotif icon={WhistleIcon} className="right-4 top-48 -z-10 h-56 w-56" />
+    <DriftMotif icon={CornerFlagIcon} className="bottom-40 right-16 -z-10 h-64 w-64" distance={40} />
     <p className="eyebrow">Legal</p>
     <h1 className="t-h1 mt-6">{title}</h1>
     <p className="mt-6 text-sm text-slate-400">Last updated: {SITE.legalUpdated} · Version {SITE.cookiePolicyVersion}</p>

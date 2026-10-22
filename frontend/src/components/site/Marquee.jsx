@@ -14,7 +14,7 @@ const Row = ({ hidden }) => (
 );
 
 export const Marquee = () => (
-  <section aria-label="Areas of focus" data-testid="home-marquee" className="relative overflow-hidden border-y border-line bg-ink-950 py-10 md:py-14">
+  <section aria-label="Areas of focus" data-testid="home-marquee" className="relative overflow-hidden border-y border-line bg-ink-950/55 py-10 md:py-14">
     <div className="marquee-track flex w-max">
       <Row />
       <Row hidden />

@@ -2,6 +2,8 @@ import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { Camera, Clapperboard, Compass, Users } from "lucide-react";
 import { Reveal } from "@/components/site/Reveal";
+import { DriftMotif, GlowHalo } from "@/components/football/Atmosphere";
+import { FloodlightIcon, BallIcon } from "@/components/football/motifs";
 import { Picture } from "@/components/site/Picture";
 
 const ITEMS = [
@@ -18,7 +20,10 @@ export const ApproachStrip = () => {
   const y = useTransform(scrollYProgress, [0, 1], reduce ? ["0%", "0%"] : ["-8%", "8%"]);
 
   return (
-    <section ref={ref} aria-labelledby="approach-title" data-testid="home-approach" className="relative border-t border-line bg-ink-900/40 py-section">
+    <section ref={ref} aria-labelledby="approach-title" data-testid="home-approach" className="relative overflow-hidden border-t border-line bg-ink-900/40 py-section">
+      <DriftMotif icon={FloodlightIcon} className="right-[8%] top-28 h-56 w-56 lg:right-[18%]" />
+      <DriftMotif icon={BallIcon} className="-left-16 bottom-10 h-72 w-72" distance={40} />
+      <GlowHalo className="-left-40 top-0 h-[520px] w-[520px]" />
       <div className="container-x grid gap-14 lg:grid-cols-12">
         <div className="lg:col-span-5">
           <Reveal><p className="eyebrow">My Approach</p></Reveal>
@@ -36,7 +41,7 @@ export const ApproachStrip = () => {
         </div>
         <ul className="grid gap-px self-end border border-line bg-line sm:grid-cols-2 lg:col-span-7">
           {ITEMS.map((item, i) => (
-            <Reveal as="li" key={item.title} delay={i * 0.08} className="group relative bg-ink-950 p-8 transition-colors duration-500 hover:bg-ink-800 md:p-10">
+            <Reveal as="li" key={item.title} delay={i * 0.08} className="group relative bg-ink-900/85 p-8 transition-colors duration-500 hover:bg-ink-800 md:p-10">
               <span className="font-body text-xs font-semibold tracking-[0.24em] text-slate-400">{String(i + 1).padStart(2, "0")}</span>
               <item.icon aria-hidden="true" className="mt-8 h-9 w-9 text-volt-bright transition-transform duration-500 ease-cine group-hover:-translate-y-1 group-hover:rotate-[-6deg]" strokeWidth={1.5} />
               <h3 className="t-h3 mt-6">{item.title}</h3>

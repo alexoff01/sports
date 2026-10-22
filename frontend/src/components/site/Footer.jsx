@@ -11,7 +11,7 @@ export const Footer = () => {
   const { openSettings } = useConsent();
   const year = new Date().getFullYear();
   return (
-    <footer data-testid="site-footer" className="relative border-t border-line bg-ink-950">
+    <footer data-testid="site-footer" className="relative border-t border-line bg-ink-950/85">
       <div className="container-x grid gap-12 py-16 md:grid-cols-12">
         <div className="md:col-span-5">
           <Logo height="h-8" testId="footer-logo-link" />

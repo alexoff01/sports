@@ -10,8 +10,8 @@ module.exports = {
         body: ['"Plus Jakarta Sans"', "system-ui", "sans-serif"],
       },
       colors: {
-        ink: { 950: "var(--ink-950)", 900: "var(--ink-900)", 800: "var(--ink-800)", 700: "var(--ink-700)" },
-        volt: { DEFAULT: "var(--volt)", bright: "var(--volt-bright)" },
+        ink: { 950: "rgb(var(--ink-950-rgb) / <alpha-value>)", 900: "rgb(var(--ink-900-rgb) / <alpha-value>)", 800: "rgb(var(--ink-800-rgb) / <alpha-value>)", 700: "rgb(var(--ink-700-rgb) / <alpha-value>)" },
+        volt: { DEFAULT: "rgb(var(--volt-rgb) / <alpha-value>)", bright: "rgb(var(--volt-bright-rgb) / <alpha-value>)" },
         line: { DEFAULT: "var(--line)", strong: "var(--line-strong)" },
         paper: "var(--paper)",
         background: "hsl(var(--background))",

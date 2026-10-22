@@ -3,6 +3,7 @@ import { HomeHero } from "@/components/home/HomeHero";
 import { Marquee } from "@/components/site/Marquee";
 import { SelectedProjects } from "@/components/home/SelectedProjects";
 import { ApproachStrip } from "@/components/home/ApproachStrip";
+import { PitchDivider } from "@/components/football/PitchDivider";
 
 export default function Home() {
   useSeo({
@@ -15,6 +16,7 @@ export default function Home() {
       <HomeHero />
       <Marquee />
       <SelectedProjects />
+      <PitchDivider />
       <ApproachStrip />
     </>
   );

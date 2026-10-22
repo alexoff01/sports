@@ -12,7 +12,7 @@ export const CtaLink = ({ to, children, variant = "primary", testId, className =
     <Link
       to={to}
       data-testid={testId}
-      className={`group relative inline-flex min-h-[52px] items-center gap-3 overflow-hidden rounded-sm border px-7 font-display text-base font-bold uppercase tracking-[0.14em] ${v.base} ${className}`}
+      className={`group relative inline-flex min-h-[52px] items-center gap-3 overflow-hidden rounded-sm border px-7 font-display text-base font-bold uppercase tracking-[0.14em] transition-transform duration-150 active:scale-[0.98] ${v.base} ${className}`}
       {...rest}
     >
       <span

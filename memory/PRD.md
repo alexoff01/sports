@@ -30,6 +30,10 @@ Build a complete, production-ready portfolio / business-card website for Alex Ce
 - Favicons/app icons (16/32/180/192/512 + ico) and OG image generated from the logo
 - 16 AI-generated, uniformly graded images (AVIF/WebP/JPEG, sm/lg, width/height, picture element); old stock images removed; seed data + DB paths updated; docs/image-credits.md
 
+## Implemented (2026-10-22, change request 3)
+- Global fixed SiteBackground (home hero image, route-based overlay), FloodlightIntro (beams + logo sweep), MatchClockProgress, SpotlightCursor, BallTrajectory, TacticsBoard, PitchDivider, GoalNet, DriftMotif/LightBeam/GlowHalo, CoverPlaceholder, football line-art motif set, diagonal page wipe, card sweep + tilt, quote word reveal, themed 404
+- Tailwind ink/volt colours switched to rgb channels so opacity modifiers work
+
 ## Backlog
 - P0: Fill TODO_CONFIRM items (socials, quote, legal details, production domain, portrait)
 - P1: Frontend CSP/HSTS headers at hosting layer; dependency audit; Lighthouse pass

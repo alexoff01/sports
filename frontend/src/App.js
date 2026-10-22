@@ -5,7 +5,10 @@ import { MotionConfig } from "framer-motion";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { SmoothScroll } from "@/components/site/SmoothScroll";
-import { IntroLoader } from "@/components/site/IntroLoader";
+import { FloodlightIntro } from "@/components/football/FloodlightIntro";
+import { SiteBackground } from "@/components/football/SiteBackground";
+import { MatchClockProgress } from "@/components/football/MatchClockProgress";
+import { SpotlightCursor } from "@/components/football/SpotlightCursor";
 import { PageTransition } from "@/components/site/PageTransition";
 import { CookieBanner } from "@/components/site/CookieBanner";
 import { ConsentProvider } from "@/components/site/ConsentProvider";
@@ -35,7 +38,10 @@ const PublicSite = () => {
       <a href="#main" className="sr-only z-[90] bg-volt px-4 py-3 font-semibold focus:not-sr-only focus:fixed focus:left-4 focus:top-4" data-testid="skip-to-content">
         Skip to content
       </a>
-      <IntroLoader />
+      <SiteBackground />
+      <SpotlightCursor />
+      <MatchClockProgress />
+      <FloodlightIntro />
       <Header />
       <main id="main" tabIndex={-1} className="focus:outline-none">
         <Routes location={location} key={location.pathname}>

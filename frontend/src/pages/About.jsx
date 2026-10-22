@@ -6,6 +6,11 @@ import { MaskedHeadline } from "@/components/site/MaskedHeadline";
 import { Reveal } from "@/components/site/Reveal";
 import { CtaLink } from "@/components/site/CtaLink";
 import { CtaBand } from "@/components/site/CtaBand";
+import { motion, useReducedMotion } from "framer-motion";
+import { TacticsBoard } from "@/components/football/TacticsBoard";
+import { PitchDivider } from "@/components/football/PitchDivider";
+import { DriftMotif, GlowHalo, LightBeam } from "@/components/football/Atmosphere";
+import { BootIcon, GloveIcon } from "@/components/football/motifs";
 
 const APPROACH = [
   { title: "Creativity", text: "Look for the angle nobody filmed: the tunnel, the kit room, the fan who never misses a match." },
@@ -25,7 +30,9 @@ const SKILLS = [
 
 const AboutHero = () => (
   <section className="container-x grid gap-12 pb-section pt-40 md:pt-48 lg:grid-cols-12 lg:items-end" aria-labelledby="about-title">
-    <div className="lg:col-span-7">
+    <div className="relative lg:col-span-7">
+      <GlowHalo className="-left-40 -top-10 h-[480px] w-[480px]" />
+      <TacticsBoard className="left-0 top-6 w-full max-w-[720px] opacity-80" delay={0.9} />
       <p className="eyebrow">About Me</p>
       <MaskedHeadline testId="about-title" className="h-display mt-6" delay={0.25} lines={[{ text: "Sports lover." }, { text: "Digital creator.", accent: true }]} />
       <Reveal delay={0.45}>
@@ -46,7 +53,7 @@ const AboutHero = () => (
 
 const Certification = () => (
   <section className="container-x pb-section" aria-labelledby="cert-title">
-    <Reveal className="grid gap-8 border border-line bg-ink-900 p-8 md:grid-cols-12 md:items-center md:p-12" data-testid="certification-block">
+    <Reveal className="grid gap-8 border border-line bg-ink-900/85 p-8 md:grid-cols-12 md:items-center md:p-12" data-testid="certification-block">
       <Award aria-hidden="true" className="h-14 w-14 text-volt-bright md:col-span-1" strokeWidth={1.3} />
       <div className="md:col-span-8">
         <p className="eyebrow">Certification</p>
@@ -65,7 +72,7 @@ const Approach = () => (
       <h2 id="about-approach-title" className="t-h2 mt-5">Creativity · Strategy · <span className="text-volt">Storytelling · Community</span></h2>
       <ol className="mt-14 grid gap-px border border-line bg-line md:grid-cols-2 lg:grid-cols-4">
         {APPROACH.map((a, i) => (
-          <Reveal as="li" key={a.title} delay={i * 0.08} className="bg-ink-950 p-8">
+          <Reveal as="li" key={a.title} delay={i * 0.08} className="bg-ink-900/85 p-8">
             <span className="font-display text-6xl font-extrabold text-outline">{String(i + 1).padStart(2, "0")}</span>
             <h3 className="t-h3 mt-6">{a.title}</h3>
             <p className="body-copy mt-3">{a.text}</p>
@@ -77,7 +84,9 @@ const Approach = () => (
 );
 
 const Skills = () => (
-  <section className="container-x py-section" aria-labelledby="skills-title">
+  <section className="container-x relative py-section" aria-labelledby="skills-title">
+    <DriftMotif icon={BootIcon} className="-right-6 top-16 -z-10 h-40 w-80" />
+    <DriftMotif icon={GloveIcon} className="-left-10 bottom-10 -z-10 h-56 w-56" distance={40} />
     <p className="eyebrow">Skills &amp; Expertise</p>
     <h2 id="skills-title" className="t-h2 mt-5">What I bring <span className="text-volt">to a team.</span></h2>
     <p className="lead mt-5 max-w-2xl">Capabilities I practise in my own projects and want to keep developing in a professional setting.</p>
@@ -93,13 +102,31 @@ const Skills = () => (
   </section>
 );
 
+const QuoteWords = () => {
+  const reduce = useReducedMotion();
+  return (
+    <motion.p
+      className="container-x relative max-w-5xl py-28 font-display text-[clamp(2rem,5vw,4.25rem)] font-bold uppercase leading-[1] text-paper md:py-36"
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ staggerChildren: reduce ? 0 : 0.06 }}
+    >
+      {SITE.quote.split(" ").map((word, i) => (
+        <motion.span key={i} className="inline-block pr-[0.25em]" variants={{ hidden: { opacity: reduce ? 1 : 0, y: reduce ? 0 : 12 }, show: { opacity: 1, y: 0 } }} transition={{ duration: 0.45 }}>
+          {word}
+        </motion.span>
+      ))}
+    </motion.p>
+  );
+};
+
 const QuoteBand = () => (
   <section className="relative overflow-hidden border-y border-line" aria-label="Statement" data-testid="quote-band">
     <Picture src="/images/band-grass-lines-lg.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-bottom opacity-40" />
     <div className="absolute inset-0 bg-ink-950/70" aria-hidden="true" />
-    <Reveal className="container-x relative py-28 md:py-36">
-      <p className="max-w-5xl font-display text-[clamp(2rem,5vw,4.25rem)] font-bold uppercase leading-[1] text-paper">{SITE.quote}</p>
-    </Reveal>
+    <LightBeam className="-top-1/3 left-[30%]" />
+    <QuoteWords />
   </section>
 );
 
@@ -113,6 +140,7 @@ export default function About() {
     <>
       <AboutHero />
       <Certification />
+      <PitchDivider />
       <Approach />
       <Skills />
       <QuoteBand />

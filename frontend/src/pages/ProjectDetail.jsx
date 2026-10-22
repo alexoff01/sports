@@ -9,6 +9,9 @@ import { TypeBadge } from "@/components/site/ProjectCard";
 import { CtaBand } from "@/components/site/CtaBand";
 import { PhoneMockup } from "@/components/project/PhoneMockup";
 import NotFound from "@/pages/NotFound";
+import { PitchDivider } from "@/components/football/PitchDivider";
+import { DriftMotif } from "@/components/football/Atmosphere";
+import { WhistleIcon } from "@/components/football/motifs";
 
 const STEPS = [
   { key: "context", label: "Context" },
@@ -51,7 +54,8 @@ const DetailHero = ({ p }) => (
 );
 
 const CaseStudy = ({ p }) => (
-  <section className="container-x grid gap-12 py-section lg:grid-cols-12" aria-label="Case study">
+  <section className="container-x relative grid gap-12 py-section lg:grid-cols-12" aria-label="Case study">
+    <DriftMotif icon={WhistleIcon} className="bottom-16 left-4 -z-10 h-48 w-48" />
     <nav aria-label="Case study sections" className="hidden lg:col-span-3 lg:block">
       <ol className="sticky top-32 space-y-1 border-l border-line">
         {STEPS.map((s, i) => (
@@ -71,7 +75,7 @@ const CaseStudy = ({ p }) => (
           <p className="lead mt-6 whitespace-pre-line">{p[s.key]}</p>
         </Reveal>
       ))}
-      <p className="flex gap-3 border border-line bg-ink-900 p-5 text-sm leading-relaxed text-slate-300" data-testid="project-disclaimer">
+      <p className="flex gap-3 border border-line bg-ink-900/85 p-5 text-sm leading-relaxed text-slate-300" data-testid="project-disclaimer">
         <Info aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-volt-bright" />
         {p.project_type === "Real"
           ? "Real project. Details shared with permission."
@@ -128,6 +132,7 @@ export default function ProjectDetail() {
     <>
       <DetailHero p={project} />
       <CaseStudy p={project} />
+      <PitchDivider />
       <Mockups p={project} />
       <CtaBand />
     </>

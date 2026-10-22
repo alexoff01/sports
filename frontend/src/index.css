@@ -10,6 +10,12 @@
         --ink-700: #131d38;
         --volt: #2f6bff;
         --volt-bright: #5185ff;
+        --ink-950-rgb: 5 7 13;
+        --ink-900-rgb: 10 16 32;
+        --ink-800-rgb: 13 21 42;
+        --ink-700-rgb: 19 29 56;
+        --volt-rgb: 47 107 255;
+        --volt-bright-rgb: 81 133 255;
         --line: rgba(47, 107, 255, 0.22);
         --line-strong: rgba(47, 107, 255, 0.55);
         --paper: #f8fafc;
@@ -49,7 +55,7 @@
         -webkit-text-size-adjust: 100%;
     }
     body {
-        @apply bg-ink-950 font-body text-paper antialiased;
+        @apply bg-transparent font-body text-paper antialiased;
         overflow-x: hidden;
     }
     ::selection {
@@ -140,10 +146,31 @@
 .scroll-cue {
     animation: scroll-cue 1.8s cubic-bezier(0.76, 0, 0.24, 1) infinite;
 }
+.net-sway {
+    transform-origin: top center;
+    animation: net-sway 10s ease-in-out infinite;
+}
+@keyframes net-sway {
+    0%,
+    100% {
+        transform: skewX(0deg) translateY(0);
+    }
+    50% {
+        transform: skewX(1.4deg) translateY(5px);
+    }
+}
+.card-sweep {
+    transform: translateX(-120%) skewX(-18deg);
+    transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.group:hover .card-sweep {
+    transform: translateX(260%) skewX(-18deg);
+}
 
 @media (prefers-reduced-motion: reduce) {
     .marquee-track,
-    .scroll-cue {
+    .scroll-cue,
+    .net-sway {
         animation: none;
     }
     *,
