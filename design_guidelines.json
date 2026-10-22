@@ -1,0 +1,138 @@
+{
+  "brand": {
+    "name": "Mativo / Mativo Hub",
+    "creator": "Alex Cearnau",
+    "tagline": "Sports Lover. Digital Creator.",
+    "archetype": "Performance Pro & Cinematic Sports Hybrid",
+    "logo_mark": "Minimalist geometric SVG stadium lightbeam 'M' logo icon"
+  },
+  "typography": {
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap",
+    "font_family_heading": "'Barlow Condensed', sans-serif",
+    "font_family_body": "'Plus Jakarta Sans', sans-serif",
+    "forbidden_fonts": ["Inter", "Space Grotesk", "Roboto", "Open Sans"],
+    "hierarchy": {
+      "eyebrow": "text-xs sm:text-sm uppercase tracking-[0.25em] text-[#2F6BFF] font-semibold flex items-center gap-2",
+      "h1": "font-['Barlow_Condensed'] text-4xl sm:text-5xl lg:text-6xl uppercase font-black tracking-tight leading-[0.95]",
+      "h2": "font-['Barlow_Condensed'] text-2xl sm:text-3xl lg:text-4xl uppercase font-bold tracking-tight leading-tight",
+      "h3": "font-['Barlow_Condensed'] text-xl sm:text-2xl uppercase font-bold tracking-normal text-white",
+      "subtitle": "text-base sm:text-lg text-slate-300 font-normal leading-relaxed max-w-2xl",
+      "body": "text-sm sm:text-base text-slate-400 font-normal leading-relaxed",
+      "caption": "text-xs text-slate-500 font-medium tracking-wide"
+    }
+  },
+  "colors": {
+    "theme": "dark",
+    "bg_main": "#05070D",
+    "bg_card": "#0D152A",
+    "bg_card_hover": "#131D38",
+    "bg_header": "rgba(5, 7, 13, 0.85)",
+    "accent_blue": "#2F6BFF",
+    "accent_blue_hover": "#5185FF",
+    "accent_blue_glow": "rgba(47, 107, 255, 0.35)",
+    "border_tinted": "rgba(47, 107, 255, 0.2)",
+    "border_tinted_hover": "rgba(47, 107, 255, 0.5)",
+    "text_primary": "#F8FAFC",
+    "text_secondary": "#94A3B8",
+    "text_muted": "#64748B",
+    "badge_bg": "rgba(47, 107, 255, 0.12)"
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#2F6BFF] hover:bg-[#5185FF] text-white font-['Barlow_Condensed'] uppercase tracking-wider font-bold px-6 py-3 rounded-sm transition-all duration-300 relative overflow-hidden group shadow-[0_0_20px_rgba(47,107,255,0.3)] hover:shadow-[0_0_30px_rgba(47,107,255,0.6)]",
+      "secondary": "bg-[#0D152A] hover:bg-[#131D38] border border-[#2F6BFF]/30 text-white font-['Barlow_Condensed'] uppercase tracking-wider font-bold px-6 py-3 rounded-sm transition-all duration-300",
+      "ghost": "text-slate-300 hover:text-white hover:bg-white/5 font-['Barlow_Condensed'] uppercase tracking-wider font-semibold px-4 py-2 rounded-sm transition-colors"
+    },
+    "cards": {
+      "project_card": "bg-[#0D152A] border border-[#2F6BFF]/20 rounded-sm overflow-hidden hover:border-[#2F6BFF]/60 transition-all duration-500 hover:-translate-y-1 shadow-lg group relative",
+      "capability_card": "bg-[#0A1020] border border-[#2F6BFF]/15 p-6 rounded-sm hover:border-[#2F6BFF]/40 transition-all duration-300",
+      "skills_card": "bg-[#0D152A] border border-[#2F6BFF]/20 p-5 rounded-sm flex items-center justify-between"
+    },
+    "inputs": {
+      "field": "bg-[#080D1A] border border-[#2F6BFF]/30 text-white placeholder-slate-500 rounded-sm px-4 py-3 focus:outline-none focus:border-[#2F6BFF] focus:ring-1 focus:ring-[#2F6BFF] transition-all text-sm w-full"
+    },
+    "gdpr_banner": {
+      "container": "fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:max-w-md bg-[#0D152A]/95 backdrop-blur-md border border-[#2F6BFF]/40 p-5 rounded-sm shadow-2xl z-50 flex flex-col gap-4",
+      "buttons_equal_prominence": "grid grid-cols-3 gap-2"
+    }
+  },
+  "pages": {
+    "home": {
+      "hero": {
+        "headline_line1": "SPORTS STORIES.",
+        "headline_line2_blue": "REAL IMPACT.",
+        "subheadline": "Alex Cearnau / Mativo Hub — Elevating sports brands with high-octane visual storytelling, tactical content creation, and stadium-tested strategy.",
+        "cta_text": "View My Work",
+        "bg_image": "https://images.unsplash.com/photo-1522778119026-d647f0596c20?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY6NzN8MHwxfHNlYXJjaHxfHxzdGFkaXVtJTIwbmlnaHQlMjBsaWdodHMlMjBmb290YmFsbCUyMGZhbnMlMjBtYXRjaHxlbnwwfHx8fDE3OTI3MDYyNjF8MA&ixlib=rb-4.1.0&q=85",
+        "features": ["Ken Burns parallax effect", "Staggered line reveal animation", "Electric blue beam sweep hover"]
+      },
+      "selected_projects_count": 4,
+      "my_approach_strip": {
+        "title": "Strategy + Creativity + Sport",
+        "capabilities": [
+          {"name": "Digital Strategy", "desc": "Audience growth blueprints built on sports analytics and peak engagement timing."},
+          {"name": "Short-Form Video", "desc": "High-impact Reels & TikTok edits capturing raw stadium emotion."},
+          {"name": "Live Event Coverage", "desc": "Real-time matchday story creation from sideline to locker room."},
+          {"name": "Community & Fans", "desc": "Turning casual spectators into loyal, active digital supporters."}
+        ]
+      }
+    },
+    "projects": {
+      "headline": "SELECTED PROJECTS / TURNING SPORT INTO STORIES.",
+      "filter_tabs": ["All", "Content Creation", "Strategy", "Video"],
+      "detail_case_study_sections": ["Context", "Objective", "Strategy", "Creative Execution", "Intended Outcome"],
+      "detail_features": ["Platform chips (Instagram, TikTok, YouTube)", "Phone mockup media preview", "Sample captions list", "Project-type badge", "Bottom CTA band"]
+    },
+    "about_me": {
+      "headline": "SPORTS LOVER. DIGITAL CREATOR.",
+      "bio": "I bridge the gap between passion on the pitch and engagement on the screen. Specializing in high-energy social media content, strategic brand positioning, and athletic digital storytelling.",
+      "certification": {
+        "title": "Social Media in Sports Certification",
+        "institution": "FC Barcelona Innovation Hub",
+        "year": "2025"
+      },
+      "approach": "Creativity · Strategy · Storytelling · Community",
+      "skills": ["Matchday Short-Form Video", "Sports Brand Strategy", "Social Media Analytics", "Fan Engagement Campaigns", "Athlete Personal Branding", "Motion Graphics & Reels"],
+      "quote": "Sport isn't just played in the stadium anymore — it's lived continuously in the palms of millions."
+    },
+    "contact": {
+      "headline": "LET'S CREATE SOMETHING THAT MOVES PEOPLE.",
+      "subtext": "Available for club partnerships, athlete branding, event coverage, and digital campaign consultations.",
+      "form_fields": ["Name", "Email", "Organization / Club", "Subject", "Message"],
+      "contact_block": {
+        "location": "Barcelona / Remote Worldwide",
+        "email": "alex@mativo.hub",
+        "socials": ["Instagram", "LinkedIn", "TikTok", "X / Twitter"]
+      }
+    },
+    "admin": {
+      "route": "/admin",
+      "features": ["Login modal with TOTP 2FA simulation", "Project CRUD list table", "Add/Edit project modal", "Delete confirmation dialog"]
+    }
+  },
+  "motion": {
+    "first_visit_loader": "Skippable screen loader (<1.2s duration) with blue lightning/energy progress bar",
+    "smooth_scroll": "Lenis smooth scroll integration",
+    "stagger_reveal": "framer-motion opacity and y-axis staggered reveals for text lines",
+    "card_hover": "Hover scale 1.02, subtle border glow, arrow icon shift +4px right",
+    "filter_animation": "framer-motion layout animations for tab switching",
+    "prefers_reduced_motion": "Respected via standard Framer Motion reduced motion options"
+  },
+  "image_urls": {
+    "stadium_hero": "https://images.unsplash.com/photo-1522778119026-d647f0596c20?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY6NzN8MHwxfHNlYXJjaHxfHxzdGFkaXVtJTIwbmlnaHQlMjBsaWdodHMlMjBmb290YmFsbCUyMGZhbnMlMjBtYXRjaHxlbnwwfHx8fDE3OTI3MDYyNjF8MA&ixlib=rb-4.1.0&q=85",
+    "stadium_night_match": "https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY6NzN8MHwxfHNlYXJjaHwyfHxzdGFkaXVtJTIwbmlnaHQlMjBsaWdodHMlMjBmb290YmFsbCUyMGZhbnMlMjBtYXRjaHxlbnwwfHx8fDE3OTI3MDYyNjF8MA&ixlib=rb-4.1.0&q=85",
+    "fans_cheering": "https://images.unsplash.com/photo-1629217855633-79a6925d6c47?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY6NzN8MHwxfHNlYXJjaHwzfHxzdGFkaXVtJTIwbmlnaHQlMjBsaWdodHMlMjBmb290YmFsbCUyMGZhbnMlMjBtYXRjaHxlbnwwfHx8fDE3OTI3MDYyNjF8MA&ixlib=rb-4.1.0&q=85",
+    "phone_filming": "https://images.pexels.com/photos/2101030/pexels-photo-2101030.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "phone_match": "https://images.unsplash.com/photo-1509473383868-b934025a9bc3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHw0fHxmb290YmFsbCUyMHNtYXJ0cGhvbmUlMjBmaWxtaW5nJTIwbWF0Y2glMjBjcmVhdG9yJTIwZmFufGVufDB8fHx8MTc5MjcwNjI2N3ww&ixlib=rb-4.1.0&q=85",
+    "matchday_action": "https://images.pexels.com/photos/3131405/pexels-photo-3131405.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "alex_portrait_creator": "https://images.unsplash.com/photo-1556816214-6d16c62fbbf6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwzfHxmb290YmFsbCUyMHNtYXJ0cGhvbmUlMjBmaWxtaW5nJTIwbWF0Y2glMjBjcmVhdG9yJTIwZmFufGVufDB8fHx8MTc5MjcwNjI2N3ww&ixlib=rb-4.1.0&q=85"
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Always set data-testid attributes on all interactive elements (buttons, links, form inputs, filter tabs, modal triggers).",
+    "Use Barlow Condensed font for headlines and Plus Jakarta Sans for body text.",
+    "Never use generic centered layouts or light backgrounds. The palette must remain pitch black (#05070D) and electric blue (#2F6BFF).",
+    "Ensure header backdrop is bg-[#05070D]/85 backdrop-blur-md z-50 to prevent content overlap readability issues.",
+    "GDPR banner buttons (Accept / Reject / Customize) MUST have equal visual prominence.",
+    "All form inputs must be fully functional with visual feedback and Sonner toasts."
+  ]
+}
