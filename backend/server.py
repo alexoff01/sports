@@ -17,6 +17,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger("portfolio")
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+auth.check_config()
 
 SECURITY_HEADERS = {
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
@@ -43,6 +44,7 @@ async def security(request: Request, call_next):
     if path.startswith("/api/admin"):
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
         response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
     return response
 
 
@@ -75,7 +77,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "X-CSRF-Token"],
 )
 
 
@@ -83,14 +85,16 @@ app.add_middleware(
 async def startup():
     await db.rate_limits.create_index("at", expireAfterSeconds=7200)
     await db.rate_limits.create_index("k")
-    await db.login_attempts.create_index("at", expireAfterSeconds=3600)
-    await db.login_attempts.create_index("ident")
-    await db.sessions.create_index("expires_at", expireAfterSeconds=0)
+    await db.admin_login_tokens.create_index("token_hash", unique=True)
+    await db.admin_login_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await db.admin_sessions.create_index("expires_at", expireAfterSeconds=0)
+    await db.admin_sessions.create_index("session_id", unique=True)
+    await db.security_events.create_index("timestamp", expireAfterSeconds=90 * 24 * 3600)
     await db.messages.create_index("created_at", expireAfterSeconds=365 * 24 * 3600)
-    await db.admins.create_index("email", unique=True)
+    for legacy in ("admins", "sessions", "login_attempts"):
+        await db.drop_collection(legacy)
     await db.projects.create_index("slug", unique=True)
     await db.projects.create_index("id", unique=True)
-    await auth.seed_admin()
     if await db.projects.count_documents({}) == 0:
         for i, p in enumerate(SEED_PROJECTS):
             await db.projects.insert_one({**p, "order": i, "published": True, "created_at": now(), "updated_at": now()})

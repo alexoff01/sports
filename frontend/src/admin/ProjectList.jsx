@@ -11,10 +11,11 @@ import { toPayload } from "@/admin/payload";
 const ICON_BTN = "grid h-11 w-11 place-items-center border border-line transition-colors hover:border-volt disabled:opacity-30";
 
 export const ProjectList = ({ projects, setProjects, reload, onEdit }) => {
-  const move = async (index, dir) => {
+  const reorder = async (from, to) => {
+    if (from === to || to < 0 || to >= projects.length) return;
     const next = [...projects];
-    const [item] = next.splice(index, 1);
-    next.splice(index + dir, 0, item);
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
     setProjects(next);
     try {
       await api.post("/admin/projects/reorder", { ids: next.map((p) => p.id) });
@@ -52,7 +53,7 @@ export const ProjectList = ({ projects, setProjects, reload, onEdit }) => {
       </div>
       <ul className="mt-8 divide-y divide-line border-y border-line" data-testid="admin-project-list">
         {projects.map((p, i) => (
-          <li key={p.id} className="flex flex-col gap-4 py-4 md:flex-row md:items-center" data-testid={`admin-project-row-${p.slug}`}>
+          <li key={p.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(i))} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); reorder(Number(e.dataTransfer.getData("text/plain")), i); }} className="flex cursor-grab flex-col gap-4 py-4 active:cursor-grabbing md:flex-row md:items-center" data-testid={`admin-project-row-${p.slug}`}>
             <img src={mediaUrl(p.cover_image)} alt="" className="h-20 w-full object-cover md:w-32" />
             <div className="min-w-0 flex-1">
               <p className="truncate font-display text-xl font-bold uppercase">{p.title}</p>
@@ -63,8 +64,8 @@ export const ProjectList = ({ projects, setProjects, reload, onEdit }) => {
                 <Switch checked={p.published} onCheckedChange={(v) => togglePublish(p, v)} className="data-[state=checked]:bg-volt" data-testid={`admin-publish-toggle-${p.slug}`} />
                 {p.published ? "Live" : "Draft"}
               </label>
-              <button type="button" aria-label="Move up" className={ICON_BTN} disabled={i === 0} onClick={() => move(i, -1)} data-testid={`admin-move-up-${p.slug}`}><ArrowUp className="h-4 w-4" /></button>
-              <button type="button" aria-label="Move down" className={ICON_BTN} disabled={i === projects.length - 1} onClick={() => move(i, 1)} data-testid={`admin-move-down-${p.slug}`}><ArrowDown className="h-4 w-4" /></button>
+              <button type="button" aria-label="Move up" className={ICON_BTN} disabled={i === 0} onClick={() => reorder(i, i - 1)} data-testid={`admin-move-up-${p.slug}`}><ArrowUp className="h-4 w-4" /></button>
+              <button type="button" aria-label="Move down" className={ICON_BTN} disabled={i === projects.length - 1} onClick={() => reorder(i, i + 1)} data-testid={`admin-move-down-${p.slug}`}><ArrowDown className="h-4 w-4" /></button>
               <button type="button" aria-label={`Edit ${p.title}`} className={ICON_BTN} onClick={() => onEdit(p)} data-testid={`admin-edit-${p.slug}`}><Pencil className="h-4 w-4" /></button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>

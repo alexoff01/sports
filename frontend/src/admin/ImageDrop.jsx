@@ -3,7 +3,7 @@ import { UploadCloud } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
-const MAX = 8 * 1024 * 1024;
+const MAX = 10 * 1024 * 1024;
 
 export const ImageDrop = ({ onUploaded, multiple = false, testId }) => {
   const input = useRef(null);
@@ -19,7 +19,7 @@ export const ImageDrop = ({ onUploaded, multiple = false, testId }) => {
         continue;
       }
       if (file.size > MAX) {
-        setError("File too large (max 8 MB).");
+        setError("File too large (max 10 MB).");
         continue;
       }
       const data = new FormData();
@@ -51,7 +51,7 @@ export const ImageDrop = ({ onUploaded, multiple = false, testId }) => {
       >
         <UploadCloud className="h-6 w-6 text-volt-bright" aria-hidden="true" />
         <span>Drop {multiple ? "images" : "an image"} here or click to choose</span>
-        <span className="text-xs text-slate-400">JPG, PNG, WebP, AVIF · max 8 MB · EXIF removed automatically</span>
+        <span className="text-xs text-slate-400">JPG, PNG, WebP, AVIF · max 10 MB · EXIF removed automatically</span>
       </button>
       <input ref={input} type="file" accept={ALLOWED.join(",")} multiple={multiple} className="sr-only" onChange={(e) => { upload(e.target.files); e.target.value = ""; }} tabIndex={-1} aria-hidden="true" />
       {progress !== null && (

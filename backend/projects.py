@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, 
 from PIL import Image, ImageOps
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from auth import get_admin
+from auth import require_admin
 from core import clean_text, client_ip, db, now, rate_limit
 
 router = APIRouter(prefix="/api")
@@ -18,7 +18,7 @@ Category = Literal["Content Creation", "Strategy", "Video"]
 ProjectType = Literal["Concept", "Personal", "Real"]
 Platform = Literal["Instagram", "TikTok", "YouTube Shorts", "X"]
 IMAGE_PATTERN = r"^(/images/[a-z0-9-]+\.webp|/api/media/[a-f0-9-]{36})$"
-MAX_UPLOAD = 8 * 1024 * 1024
+MAX_UPLOAD = 10 * 1024 * 1024
 
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
 STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
@@ -132,13 +132,13 @@ def _admin_out(doc: dict) -> dict:
 
 
 @router.get("/admin/projects")
-async def admin_list(_: str = Depends(get_admin)):
+async def admin_list(_: str = Depends(require_admin)):
     items = await db.projects.find({}, {"_id": 0}).sort("order", 1).to_list(500)
     return [_admin_out(i) for i in items]
 
 
 @router.post("/admin/projects", status_code=201)
-async def admin_create(body: ProjectIn, _: str = Depends(get_admin)):
+async def admin_create(body: ProjectIn, _: str = Depends(require_admin)):
     if await db.projects.find_one({"slug": body.slug}):
         raise HTTPException(status_code=409, detail="Slug already in use.")
     last = await db.projects.find_one({}, sort=[("order", -1)])
@@ -150,7 +150,7 @@ async def admin_create(body: ProjectIn, _: str = Depends(get_admin)):
 
 
 @router.put("/admin/projects/{project_id}")
-async def admin_update(project_id: str, body: ProjectIn, _: str = Depends(get_admin)):
+async def admin_update(project_id: str, body: ProjectIn, _: str = Depends(require_admin)):
     if await db.projects.find_one({"slug": body.slug, "id": {"$ne": project_id}}):
         raise HTTPException(status_code=409, detail="Slug already in use.")
     res = await db.projects.update_one({"id": project_id}, {"$set": {**body.model_dump(), "updated_at": now()}})
@@ -160,7 +160,7 @@ async def admin_update(project_id: str, body: ProjectIn, _: str = Depends(get_ad
 
 
 @router.delete("/admin/projects/{project_id}")
-async def admin_delete(project_id: str, _: str = Depends(get_admin)):
+async def admin_delete(project_id: str, _: str = Depends(require_admin)):
     res = await db.projects.delete_one({"id": project_id})
     if not res.deleted_count:
         raise HTTPException(status_code=404, detail="Not found.")
@@ -173,7 +173,7 @@ class ReorderIn(BaseModel):
 
 
 @router.post("/admin/projects/reorder")
-async def admin_reorder(body: ReorderIn, _: str = Depends(get_admin)):
+async def admin_reorder(body: ReorderIn, _: str = Depends(require_admin)):
     for index, pid in enumerate(body.ids):
         await db.projects.update_one({"id": pid}, {"$set": {"order": index, "updated_at": now()}})
     return {"ok": True}
@@ -203,11 +203,11 @@ def _process(data: bytes) -> tuple[bytes, int, int]:
 
 
 @router.post("/admin/uploads", status_code=201)
-async def upload(request: Request, file: UploadFile = File(...), _: str = Depends(get_admin)):
+async def upload(request: Request, file: UploadFile = File(...), _: str = Depends(require_admin)):
     await rate_limit("upload", client_ip(request), 60, 3600)
     data = await file.read(MAX_UPLOAD + 1)
     if len(data) > MAX_UPLOAD:
-        raise HTTPException(status_code=413, detail="File too large (max 8 MB).")
+        raise HTTPException(status_code=413, detail="File too large (max 10 MB).")
     if not _sniff(data[:16]):
         raise HTTPException(status_code=415, detail="Only JPG, PNG, WebP or AVIF images are allowed.")
     try:
@@ -231,7 +231,7 @@ async def media(media_id: str, request: Request):
     url = f"/api/media/{media_id}"
     public = await db.projects.find_one({"published": True, "$or": [{"cover_image": url}, {"gallery": url}]})
     if not public:
-        await get_admin(request)
+        await require_admin(request)
     data = await asyncio.to_thread(_get, record["path"])
     cache = "public, max-age=86400" if public else "private, no-store"
-    return Response(content=data, media_type="image/webp", headers={"Cache-Control": cache})
+    return Response(content=data, media_type="image/webp", headers={"Cache-Control": cache, "Content-Disposition": f'inline; filename="{media_id}.webp"', "X-Content-Type-Options": "nosniff"})

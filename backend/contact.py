@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from auth import get_admin
+from auth import require_admin
 from core import clean_text, client_ip, db, now, rate_limit
 from emailer import EMAIL_FROM_NAME, send_email
 
@@ -74,7 +74,7 @@ async def contact(body: ContactIn, request: Request):
 
 
 @router.get("/admin/messages")
-async def list_messages(_: str = Depends(get_admin)):
+async def list_messages(_: str = Depends(require_admin)):
     items = await db.messages.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     for m in items:
         m["created_at"] = m["created_at"].isoformat()
@@ -82,7 +82,7 @@ async def list_messages(_: str = Depends(get_admin)):
 
 
 @router.delete("/admin/messages/{message_id}")
-async def delete_message(message_id: str, _: str = Depends(get_admin)):
+async def delete_message(message_id: str, _: str = Depends(require_admin)):
     res = await db.messages.delete_one({"id": message_id})
     if not res.deleted_count:
         raise HTTPException(status_code=404, detail="Not found.")
