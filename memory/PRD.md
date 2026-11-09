@@ -12,7 +12,7 @@ Build a complete, production-ready portfolio / business-card website for Alex Ce
 
 ## Architecture
 - Backend: server.py, core.py, auth.py, contact.py, projects.py, emailer.py, seed_data.py
-- Frontend: config/site.js, lib/, components/site|home|project|contact, pages/, admin/ (lazy chunk at /studio-x7k2)
+- Frontend: config/site.js, lib/, components/site|home|project|contact, pages/, admin/ (lazy chunk at the hidden ADMIN_PATH)
 - Docs: README.md, SECURITY.md, .env.example files
 
 ## Implemented (2026-10-22)
@@ -34,11 +34,16 @@ Build a complete, production-ready portfolio / business-card website for Alex Ce
 - Global fixed SiteBackground (home hero image, route-based overlay), FloodlightIntro (beams + logo sweep), MatchClockProgress, SpotlightCursor, BallTrajectory, TacticsBoard, PitchDivider, GoalNet, DriftMotif/LightBeam/GlowHalo, CoverPlaceholder, football line-art motif set, diagonal page wipe, card sweep + tilt, quote word reveal, themed 404
 - Tailwind ink/volt colours switched to rgb channels so opacity modifiers work
 
+## Implemented (2026-11-09, change request 4: pre-created admin account)
+- Magic-link login removed. Single admin seeded from env (Argon2id), email + password login, mandatory TOTP (setup with QR, manual key, 8 recovery codes; verify with replay protection), revocable sessions (12 h / 30 min idle, rotation), lockout per account + IP, CSRF double-submit bound to session, rate limits, audit events (hashed IP, TTL 90 d), production start-up guard
+- Settings: change password (>=12, not email, revokes other sessions), TOTP status, recovery codes left; one-time weak-password banner; idle warning dialog
+- Projects: publish endpoint, videos field, drag-and-drop reorder; Media library; chunked mp4/webm uploads; images re-encoded to WebP + AVIF
+- Studio route recognised by SHA-256 digest only; no admin code/path in public bundle; source maps off
+- scripts/reset_admin_password.py (+ --reset-totp); backend/tests/test_admin_auth.py (30 tests)
+
 ## Backlog
 - P0: Fill TODO_CONFIRM items (socials, quote, legal details, production domain, portrait)
 - P1: Frontend CSP/HSTS headers at hosting layer; dependency audit; Lighthouse pass
-- P1: Video uploads (mp4/webm)
-- P2: Drag-and-drop row reordering (currently up/down buttons); encrypt TOTP secret at rest
 
 ## Next tasks
 - Collect confirmed social URLs and approved quote from Alex

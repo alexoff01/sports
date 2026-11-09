@@ -103,6 +103,7 @@ async def startup():
     await db.projects.create_index("slug", unique=True)
     await db.projects.create_index("id", unique=True)
     await db.media.create_index("id", unique=True)
+    await db.admin_prefs.create_index("user", unique=True)
     await seed_admin(db, ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD)
     if await db.projects.count_documents({}) == 0:
         for i, p in enumerate(SEED_PROJECTS):

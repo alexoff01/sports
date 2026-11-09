@@ -1,0 +1,41 @@
+{
+  "summary": "Tested the hidden admin studio end to end on the public preview URL: login, TOTP, dashboard, project CRUD, publishing, reordering, image and video uploads, media library, Messages, Settings, sign-out and revocation, mobile 390px, and checks that the public site is unchanged. Backend: 30/30 isolated pytest tests pass, plus a new live CSRF/Origin/session regression file (9/9). Every requested flow works. No critical bugs. A few minor findings are listed below.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/projects/reorder", "issue": "Sets updated_at on EVERY project when only the order changes, so the 'Updated <date>' shown on every row in the studio becomes misleading after any up/down or drag. Suggest updating only 'order', or only touching rows whose order actually changed."},
+      {"endpoint": "DELETE /api/admin/media/{id}", "issue": "Soft delete only (deleted flag). The objects in object storage (webp/avif/mp4) are never removed, so they pile up over time. Acceptable for an MVP; note it."},
+      {"endpoint": "GET /api/media/{id} (images)", "issue": "Every image request fetches the file again from object storage (no local cache like videos have). Public pages showing uploaded covers will be slow and costly under load."},
+      {"endpoint": "POST /api/admin-auth/change-password", "issue": "A wrong current password counts as an account failure (register_failure). Five typos in Settings lock the admin out of login for 15 min. Probably intended, but worth a UI hint."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard banner", "issues": ["The weak-password banner can be dismissed, but the dismissal is not persisted; it comes back on every reload or new login (state lives in component state only). Fine if intended."]},
+      {"screen": "Public /sitemap.xml and /robots.txt", "issues": ["They contain no admin path (good), but they hard-code the host https://studio-console-1--2pxbyqz1.preview.emergentagent.com instead of the current PUBLIC_BASE_URL (9ccb7fec-...). The static files are stale. This existed before the change; left untouched because public files must not change."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_admin_auth.py", "/app/backend/tests/test_admin_live_csrf.py", "/app/test_reports/pytest/live_csrf.xml"],
+  "action_items": [
+    "Optional: in /admin/projects/reorder, stop bumping updated_at on all projects",
+    "Optional: cache image variants on disk like videos, or let the CDN cache them",
+    "Optional: point the static sitemap.xml/robots.txt at PUBLIC_BASE_URL (or generate them) before deployment"
+  ],
+  "critical_code_review_comments": [
+    "auth.py: solid. Argon2 dummy hash for unknown emails, preauth JWT then TOTP, replay protection through the totp_used unique key, sessions stored as HMACs, rotation, idle and absolute expiry, and CSRF checked against both the cookie and the server hash.",
+    "logout: only compares the CSRF cookie with the header and does not check them against the session's csrf_hash. Low risk because cookies are SameSite=strict and the Origin middleware applies.",
+    "projects.py video_complete: the whole file is uploaded with a 600 s timeout in a thread. 100 MB is fine; there is no retry.",
+    "VideoDrop: progress reaches 100 and is set to null right away, so no 'done' state is shown. Cosmetic.",
+    "The 10/hour login rate limit per IP can block a legitimate admin behind shared NAT after a few typos. Acceptable."
+  ],
+  "updated_files": ["/app/backend/tests/test_admin_live_csrf.py"],
+  "success_rate": {"backend": "100% (30/30 isolated + 9/9 live)", "frontend": "100% of requested flows"},
+  "test_credentials": "Taken from /app/memory/test_credentials.md and /app/backend/.env (never written to files). TOTP comes from /tmp/e2e_totp_secret.",
+  "seed_data_creation": "None. A TEST project (test-qa-project), a cover image and a fake mp4 were created and then deleted through the UI. 6 seeded projects remain in their original order, all published; there are 0 live media records. The real admin password was NOT changed (only negative paths were tested).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Verified: login form empty with correct autocomplete; password toggle works; 'Invalid credentials.' shown for both wrong password and unknown email; TOTP verify, including the 'Invalid code.' path; banner link opens Settings and banner dismisses; editor-missing list; create with cover upload (live preview); Draft->Live->Draft reflected in public /api/projects; move up/down persisted on the server; edit persisted; delete with cancel and confirm; media in-use delete button disabled, enabled once unused; invalid video type error; chunked mp4 upload (fake ftyp-isom file, no ffmpeg) plus Range 206; media delete then 404; Messages shows the empty state; Settings shows the email, Active and 8 of 8, and client validation for short, email and mismatch; wrong current password gives a server error; sign out shows a notice; afterwards the API returns 401, the old cookie returns 401, and reload shows login; public pages render, have no studio/admin links, and /studio-wrong plus a near-miss hash path show the 404 page; mobile 390px has no horizontal overflow. Browser automation can reuse a session via page.context.add_cookies from a saved storage_state.",
+  "rca of the issue": "No blocking issues. The banner looked missing in the first run only because the check ran before /admin-auth/settings resolved. On re-check it renders correctly."
+}

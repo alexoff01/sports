@@ -11,6 +11,7 @@ export const VideoDrop = ({ onUploaded, testId }) => {
   const [over, setOver] = useState(false);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
 
   const upload = async (files) => {
     setError("");
@@ -39,6 +40,8 @@ export const VideoDrop = ({ onUploaded, testId }) => {
       const res = await api.post(`/admin/uploads/video/${data.upload_id}/complete`, null, { timeout: 300000 });
       setProgress(100);
       onUploaded(res.data.url);
+      setDone(true);
+      setTimeout(() => setDone(false), 3000);
     } catch (err) {
       setError(errorMessage(err, "Upload failed."));
     } finally {
@@ -59,7 +62,7 @@ export const VideoDrop = ({ onUploaded, testId }) => {
         className={`flex min-h-[110px] w-full flex-col items-center justify-center gap-2 border border-dashed p-4 text-sm transition-colors disabled:opacity-70 ${over ? "border-volt bg-volt/10" : "border-line-strong hover:border-volt"}`}
       >
         <Film className="h-6 w-6 text-volt-bright" aria-hidden="true" />
-        <span>{progress !== null ? `Uploading video… ${progress}%` : "Drop a video here or click to choose"}</span>
+        <span>{progress !== null ? `Uploading video… ${progress}%` : done ? "Video uploaded" : "Drop a video here or click to choose"}</span>
         <span className="text-xs text-slate-400">MP4 or WebM · max 100 MB</span>
       </button>
       <input ref={input} type="file" accept={ALLOWED.join(",")} className="sr-only" onChange={(e) => { upload(e.target.files); e.target.value = ""; }} tabIndex={-1} aria-hidden="true" data-testid={`${testId}-input`} />

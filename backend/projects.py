@@ -208,8 +208,10 @@ async def admin_reorder(body: ReorderIn, _: AdminContext = Depends(require_admin
     ids = list(dict.fromkeys(body.ids))
     if await db.projects.count_documents({"id": {"$in": ids}}) != len(ids):
         raise HTTPException(status_code=422, detail="Unknown project in the new order.")
+    current = {d["id"]: d.get("order") async for d in db.projects.find({"id": {"$in": ids}}, {"id": 1, "order": 1})}
     for index, pid in enumerate(ids):
-        await db.projects.update_one({"id": pid}, {"$set": {"order": index, "updated_at": now()}})
+        if current.get(pid) != index:
+            await db.projects.update_one({"id": pid}, {"$set": {"order": index}})
     return {"ok": True}
 
 
@@ -423,6 +425,6 @@ async def media(media_id: str, request: Request):
         return Response(content=chunk, status_code=206 if rng else 200, media_type=ctype, headers=headers)
     variants = record.get("variants") or {"image/webp": record["path"]}
     ctype = "image/avif" if "image/avif" in (request.headers.get("accept") or "") and "image/avif" in variants else "image/webp"
-    data = await asyncio.to_thread(_get, variants[ctype])
+    data = (await _cached(record, variants[ctype], ctype.split("/")[1])).read_bytes()
     headers |= {"Vary": "Accept", "Content-Disposition": f'inline; filename="{media_id}.{ctype.split("/")[1]}"'}
     return Response(content=data, media_type=ctype, headers=headers)

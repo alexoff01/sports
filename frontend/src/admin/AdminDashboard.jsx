@@ -58,14 +58,14 @@ export const AdminDashboard = ({ onLogout }) => {
           </nav>
         </div>
       </header>
-      {account?.weak_initial_password && bannerOpen && (
+      {account?.weak_password_banner && bannerOpen && (
         <div className="border-b border-amber-400/40 bg-amber-400/10" role="status" data-testid="admin-weak-password-banner">
           <div className="container-x flex items-start gap-3 py-3 text-sm text-amber-100">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
             <p className="flex-1">You are still using the initial password. We recommend choosing a longer one (at least 12 characters).{" "}
               <button type="button" onClick={() => setView({ tab: "settings", editing: null })} className="font-semibold underline underline-offset-4" data-testid="admin-weak-password-change">Change password</button>
             </p>
-            <button type="button" aria-label="Dismiss" onClick={() => setBannerOpen(false)} className="grid h-8 w-8 place-items-center" data-testid="admin-weak-password-dismiss"><X className="h-4 w-4" /></button>
+            <button type="button" aria-label="Dismiss" onClick={() => { setBannerOpen(false); api.post("/admin-auth/settings/dismiss-password-banner").catch(() => {}); }} className="grid h-8 w-8 place-items-center" data-testid="admin-weak-password-dismiss"><X className="h-4 w-4" /></button>
           </div>
         </div>
       )}

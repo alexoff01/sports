@@ -387,7 +387,9 @@ async def logout(request: Request, response: Response):
     cookie, header = request.cookies.get(CSRF_COOKIE, ""), request.headers.get("x-csrf-token", "")
     data = _read(request.cookies.get(SESSION_COOKIE), "session")
     if data:
-        if not cookie or not header or not hmac.compare_digest(cookie, header):
+        session = await db.admin_sessions.find_one({"session_id": sid_hash(data["sid"])}, {"csrf_hash": 1})
+        if not cookie or not header or not hmac.compare_digest(cookie, header) \
+                or (session and not hmac.compare_digest(sid_hash(header), session.get("csrf_hash", ""))):
             raise HTTPException(status_code=403, detail="Forbidden.")
         await db.admin_sessions.update_one({"session_id": sid_hash(data["sid"])}, {"$set": {"revoked": True}})
         await log_event("logout", request)
@@ -424,11 +426,20 @@ async def settings(admin: AdminContext = Depends(require_admin)):
     user = await db.users.find_one({"email": admin.email})
     weak_initial = bool(ADMIN_INITIAL_PASSWORD) and is_weak(ADMIN_INITIAL_PASSWORD) and await asyncio.to_thread(
         verify_password, user.get("password_hash"), ADMIN_INITIAL_PASSWORD)
+    prefs = await db.admin_prefs.find_one({"user": admin.email}) or {}
     return {
         "email": admin.email,
         "totp_required": REQUIRE_TOTP,
         "totp_enabled": bool(user.get("totp_enabled")),
         "recovery_codes_remaining": len(user.get("recovery_codes_hashed") or []),
         "weak_initial_password": weak_initial,
+        "weak_password_banner": weak_initial and not prefs.get("weak_banner_dismissed"),
         "idle_timeout_seconds": int(IDLE.total_seconds()),
     }
+
+
+@router.post("/settings/dismiss-password-banner")
+async def dismiss_password_banner(admin: AdminContext = Depends(require_admin)):
+    """The weak-password recommendation is shown once; dismissing it is remembered."""
+    await db.admin_prefs.update_one({"user": admin.email}, {"$set": {"weak_banner_dismissed": True, "updated_at": now()}}, upsert=True)
+    return {"ok": True}

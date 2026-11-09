@@ -1,40 +1,39 @@
 # Security controls
 
-Stack actually used: React (CRA) frontend, FastAPI backend, MongoDB, Emergent object storage and managed email.
-(The original brief named Next.js + Supabase; the owner chose to keep this stack.)
+Stack: React (CRA) frontend, FastAPI backend, MongoDB, Emergent object storage and managed email.
 
-## Implemented and verified (curl, 2026-10-22)
-- **Admin authentication**: single whitelisted account (`ADMIN_EMAILS`), bcrypt (12 rounds), password policy enforced at seed (>=14 chars, upper, lower, digit, symbol). No sign-up endpoint exists.
-- **Mandatory TOTP MFA**: password step only issues a 5-minute `mv_pending` cookie; a session is created only after a valid TOTP code. First login forces enrolment (QR). Codes cannot be replayed.
-- **Sessions**: `mv_session` cookie is httpOnly, Secure, SameSite=Strict, Path=/api, 30-minute lifetime, server-side session record (revoked on logout). The studio UI signs out after 15 minutes of inactivity.
-- **Brute force**: 5 failed attempts per IP+email or per email lock login/verify for 15 minutes; 20 auth requests per IP per 15 minutes. Generic errors ("Invalid credentials.") and a dummy bcrypt check for unknown emails prevent user enumeration.
-- **Authorization**: every `/api/admin/*` route depends on `get_admin` (cookie + session + MFA + whitelist). Unauthenticated calls return 401 (verified for projects, messages, uploads, me).
-- **Public data**: `/api/projects` returns published projects only; drafts return 404. Uploaded media is served publicly only when referenced by a published project, otherwise admin-only.
-- **CSRF**: all POST/PUT/PATCH/DELETE under `/api` must carry an `Origin` in `CORS_ORIGINS` (403 otherwise) plus SameSite=Strict cookies. CORS is restricted to the same list.
-- **Contact form**: Pydantic schema validation server-side (Zod client-side), control-character stripping, honeypot field (silently dropped), 5 submissions per IP per hour, HTML-escaped email template, no caller-controlled recipient/subject/body. Validation errors never echo input.
-- **Uploads**: magic-byte allowlist (JPEG, PNG, WebP, AVIF), 8 MB limit, decoded and re-encoded to WebP with Pillow (strips EXIF/metadata, max 2400 px, 50 MP decompression cap), random UUID filenames, 60 uploads per hour. SVG/HTML/executables are rejected (verified with an SVG renamed to .jpg → 415).
-- **Privacy in logs and storage**: IPs/emails used for rate limiting are stored only as salted SHA-256 hashes with a 2-hour TTL; logs never contain message content or addresses. Messages auto-delete after 12 months (TTL index).
-- **API headers**: HSTS (2 years, preload), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. `/api/admin/*` adds `X-Robots-Tag: noindex, nofollow` and `Cache-Control: no-store`. OpenAPI/docs endpoints are disabled.
-- **Admin discoverability**: the studio route comes from `REACT_APP_ADMIN_PATH`, is not linked, not in the sitemap or robots.txt, sets `noindex, nofollow`, and its code is a separate lazy-loaded chunk. Note: the path string is present in the main JS bundle (not in the HTML). Security never relies on hiding it.
-- **Secrets**: only in `.env` files (examples in `.env.example`); no secret reaches the frontend bundle.
-- **Emails are obfuscated**: stored reversed/split in `src/config/site.js` and assembled in the browser.
-- **Errors**: custom 404 page, React error boundary page, generic JSON 500 responses.
+## Admin access (verified by `backend/tests/test_admin_auth.py` and a live end-to-end run)
+- **Single pre-seeded account, no registration.** At startup `seed.py` creates the one admin from `ADMIN_EMAIL` / `ADMIN_INITIAL_PASSWORD` if it does not exist. It never overwrites an existing account and refuses to create a second one (a unique index on `role` also enforces one admin at database level). There is no sign-up, invite, user listing, user-creation or email-reset endpoint.
+- **Passwords**: Argon2id (OWASP parameters m=19 MiB, t=2, p=1). Every login runs exactly one Argon2 verification (against a dummy hash when the email is unknown), so a wrong email and a wrong password give identical responses ("Invalid credentials."). Passwords chosen in Settings or with the reset script need at least 12 characters and must differ from the email. A weak initial password only logs a warning (never the value) and shows a one-time banner in the studio.
+- **Recovery**: `python scripts/reset_admin_password.py` on the server (hidden input, revokes all sessions; `--reset-totp` also clears two-factor for a lost device). There is no email reset flow.
+- **Mandatory TOTP** (`ADMIN_REQUIRE_TOTP=true`): the password step only issues a signed 5-minute pre-auth cookie. First sign-in enrols TOTP (QR rendered locally, manual key, 8 single-use recovery codes shown once). Codes accept a +/-1 step window and cannot be replayed. Secrets are encrypted at rest (Fernet, `TOTP_ENCRYPTION_KEY`); recovery codes are stored as keyed hashes and consumed on use.
+- **Sessions**: random session id inside a signed JWT, cookie `__Host-admin_session` (HttpOnly, Secure, SameSite=Strict, Path=/). Stored server-side (hashed id, TTL index) so they can be revoked; 12-hour absolute lifetime, 30-minute idle timeout; the id rotates on every successful two-factor step; logout and password change revoke sessions. The studio warns before the idle sign-out.
+- **Lockout**: 5 failed password or TOTP attempts lock the account and the IP for 15 minutes with a progressive delay; success resets the counter. Messages stay generic.
+- **Rate limits (per IP)**: login 10/hour, TOTP verify/confirm 5 per 10 minutes, admin mutations and uploads 60/minute, contact form 5/hour.
+- **Authorization**: one dependency, `require_admin`, guards every admin endpoint (projects, publish, reorder, uploads, media, messages, settings, change password). It checks signature, stored session, revocation, absolute and idle expiry, and the admin role. Tests enumerate all admin routes and prove 401 without a valid session and 403 without CSRF.
+- **CSRF**: double-submit token (`__Host-admin_csrf` cookie + `X-CSRF-Token` header, also bound to the session server-side) on every state-changing admin request, plus SameSite=Strict and a strict `Origin` check. CORS allows only `PUBLIC_BASE_URL` (plus `http://localhost:3000` when `APP_ENV=development`).
+- **Audit trail**: security events (login failed/succeeded, TOTP, lockout, password changed, logout) with a hashed IP only, TTL 90 days. Passwords, hashes, tokens and full IPs are never stored in events or logs.
+- **Production start-up guard**: with `APP_ENV=production` the backend refuses to start if `ADMIN_EMAIL`, `JWT_SECRET` (min 32 bytes), `ADMIN_PATH`, `TOTP_ENCRYPTION_KEY` or an https `PUBLIC_BASE_URL` is missing or weak.
 
-## Not implemented / not verified here
-- **Frontend CSP with nonces and HSTS for HTML pages**: a CRA single-page app is static, so nonce-based CSP must be set by the hosting layer. Recommended header for the static site (no inline scripts needed except the JSON-LD block, which can be hashed):
-  `default-src 'self'; script-src 'self' 'sha256-<hash-of-inline-scripts>'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'`
-  plus HSTS, nosniff, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, `COOP: same-origin`, and `X-Robots-Tag: noindex, nofollow` for `/<ADMIN_PATH>*`.
-- The Emergent preview injects `emergent-main.js` in `index.html`; review it before production hosting elsewhere.
-- Video uploads (mp4/webm) are not enabled.
-- TOTP secrets are stored unencrypted in MongoDB (DB access must be restricted).
-- `yarn audit` / `pip-audit` not run in this session.
-- Lighthouse scores not measured.
+## Data and uploads
+- **Public data**: public endpoints return only `published: true` projects through a field allowlist (no order, timestamps or draft flag). Uploaded media is public only when used by a published project.
+- **Uploads** (admin only): magic-byte allowlist (JPEG, PNG, WebP, AVIF; MP4/WebM videos), 10 MB images / 100 MB videos (videos in 5 MB chunks), random UUID names, images decoded and re-encoded (EXIF stripped, max 2400 px, 50 MP cap) into WebP and AVIF (served by `Accept` negotiation). SVG, HTML and executables are rejected. Media is served with the correct type and `nosniff`. Deleting media hides it immediately (soft delete); stored objects stay in object storage.
+- **Contact form**: server-side schema validation, control-character stripping, honeypot, rate limit, HTML-escaped email template.
+
+## Headers
+API responses: HSTS, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, CSP `default-src 'none'; frame-ancestors 'none'` (no inline scripts), `Permissions-Policy`, COOP. Admin and auth responses add `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow`.
+
+## Admin discoverability
+The studio route is `ADMIN_PATH` (backend `.env`). Only its SHA-256 digest (`REACT_APP_ADMIN_PATH_HASH`) is in the frontend environment; the path itself never appears in HTML, sitemap, robots.txt, source maps (disabled) or the public bundle. Studio code is a separate lazy-loaded chunk and sets `noindex, nofollow`. Security never relies on hiding the path.
+
+## Not covered by the app (hosting layer)
+- CSP/HSTS and `X-Robots-Tag` for the static HTML pages (including the studio route) must be set by the host. Suggested CSP: `default-src 'self'; script-src 'self' 'sha256-<inline-script-hashes>'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'`.
+- The Emergent preview injects `emergent-main.js` and its edge adds its own CORS headers; review both before hosting elsewhere.
+- The client IP for per-IP limits is taken from the first `X-Forwarded-For` entry; account-level lockout still applies if that header is spoofed.
 
 ## Pre-launch checklist
-1. Replace all `TODO_CONFIRM` values (socials, legal details, quote, final images).
-2. Generate a new `JWT_SECRET` and `ADMIN_PASSWORD` for production; pick a new `REACT_APP_ADMIN_PATH`.
-3. Set `CORS_ORIGINS`, `REACT_APP_BACKEND_URL`, `REACT_APP_SITE_URL` to the production domain; update `public/sitemap.xml` and `robots.txt` URLs.
-4. Log in once, enrol TOTP, and store the backup secret safely.
-5. Configure the frontend security headers above at the host.
-6. Run `yarn audit` and `pip-audit`; fix high/critical findings.
-7. Have the Privacy and Cookie policies reviewed by a legal professional.
+1. Set `PUBLIC_BASE_URL`, `REACT_APP_BACKEND_URL`, `REACT_APP_SITE_URL` to the production domain (no code change needed); update `public/sitemap.xml` and `robots.txt` URLs.
+2. Keep `APP_ENV=production`, `COOKIE_SECURE=true`, `ADMIN_REQUIRE_TOTP=true`.
+3. Sign in, enrol TOTP, store the recovery codes offline, then change the initial password in Settings.
+4. Configure the frontend security headers above at the host.
+5. Run `yarn audit` and `pip-audit`; fix high/critical findings.

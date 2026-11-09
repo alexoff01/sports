@@ -63,7 +63,8 @@ export const SettingsPanel = ({ account, reload, onLogout }) => {
           {problems.length > 0 && <ul className="space-y-1 text-sm text-amber-200" data-testid="settings-password-problems">{problems.map((p) => <li key={p}>{p}</li>)}</ul>}
           <p role="alert" className="min-h-[1.25rem] text-sm text-red-300" data-testid="settings-password-error">{error}</p>
           <button type="submit" disabled={!canSubmit} className={`${BTN} sm:w-auto`} data-testid="settings-password-submit">{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}Update password</button>
-          <p className="text-xs text-slate-400">Changing the password signs out every other device.</p>
+          <p className="text-xs text-slate-400">Changing the password signs out every other device. Five wrong current passwords lock sign-in for 15 minutes.</p>
+          {account?.weak_initial_password && <p className="text-xs text-amber-200" data-testid="settings-weak-note">You are still using the initial password. A longer one is recommended.</p>}
         </form>
 
         <div className="space-y-6 lg:col-span-5">

@@ -199,7 +199,8 @@ def test_no_registration_or_user_endpoints():
     auth_paths = {p for p in paths if p.startswith("/api/admin-auth")}
     assert auth_paths == {"/api/admin-auth/login", "/api/admin-auth/totp/setup", "/api/admin-auth/totp/confirm",
                           "/api/admin-auth/totp/verify", "/api/admin-auth/session", "/api/admin-auth/logout",
-                          "/api/admin-auth/change-password", "/api/admin-auth/settings"}
+                          "/api/admin-auth/change-password", "/api/admin-auth/settings",
+                          "/api/admin-auth/settings/dismiss-password-banner"}
     c = new_client()
     for p in ("/api/admin-auth/register", "/api/register", "/api/users", "/api/admin-auth/request-link"):
         assert c.post(p, json={"email": "a@b.co", "password": "x" * 20}).status_code in (404, 405)
@@ -332,7 +333,7 @@ def _admin_routes():
     out = []
     for r in app.routes:
         path = getattr(r, "path", "")
-        if path.startswith("/api/admin/") or path in ("/api/admin-auth/change-password", "/api/admin-auth/settings"):
+        if path.startswith("/api/admin/") or path == "/api/admin-auth/change-password" or path.startswith("/api/admin-auth/settings"):
             for m in r.methods - {"HEAD", "OPTIONS"}:
                 out.append((m, path.replace("{project_id}", "00000000-0000-0000-0000-000000000000")
                             .replace("{message_id}", "00000000-0000-0000-0000-000000000000")
