@@ -51,7 +51,7 @@ export const MessagesPanel = () => {
                 </AlertDialogTrigger>
                 <AlertDialogContent className="rounded-sm border-line-strong bg-ink-900">
                   <AlertDialogTitle>Delete this message?</AlertDialogTitle>
-                  <AlertDialogDescription>This permanently removes the message and the sender's details.</AlertDialogDescription>
+                  <AlertDialogDescription>This permanently removes the message and the sender&apos;s details.</AlertDialogDescription>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={() => remove(m.id)} className="bg-red-600 hover:bg-red-500">Delete</AlertDialogAction>

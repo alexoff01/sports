@@ -1,3 +1,9 @@
+"""Admin authentication: email + password, mandatory TOTP, revocable server-side sessions, lockout, CSRF.
+
+There is deliberately no registration, password-reset-by-email or user listing endpoint. The single admin
+account is seeded from the environment at startup (see seed.py) and can be recovered with
+scripts/reset_admin_password.py on the server.
+"""
 import asyncio
 import base64
 import hashlib
@@ -5,62 +11,75 @@ import hmac
 import io
 import logging
 import os
-import random
 import secrets
 import time
+from dataclasses import dataclass
 from datetime import timedelta
 
 import jwt
 import pyotp
 import qrcode
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
-from pymongo import ReturnDocument
+from pydantic import BaseModel, ConfigDict, Field
+from pymongo.errors import DuplicateKeyError
 
+from config import ADMIN_INITIAL_PASSWORD, COOKIE_SECURE, JWT_SECRET, REQUIRE_TOTP, TOTP_ENCRYPTION_KEY
 from core import client_ip, db, hash_key, now, rate_limit
-from emailer import send_email
+from passwords import hash_password, is_weak, policy_error, verify_password
 
 logger = logging.getLogger("portfolio.auth")
-
-ADMIN_EMAIL = os.environ["ADMIN_EMAIL"].strip().lower()
-ADMIN_PATH = "/" + os.environ["ADMIN_PATH"].strip("/")
-JWT_SECRET = os.environ["JWT_SECRET"]
-TOKEN_PEPPER = os.environ["TOKEN_PEPPER"]
-PUBLIC_BASE_URL = os.environ["PUBLIC_BASE_URL"].rstrip("/")
-REQUIRE_TOTP = os.environ.get("ADMIN_REQUIRE_TOTP", "true").lower() != "false"
-COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() != "false"
-APP_ENV = os.environ.get("APP_ENV", "production")
-HAS_EMAIL_KEY = bool(os.environ.get("EMERGENT_EMAIL_KEY"))
 
 PREFIX = "__Host-" if COOKIE_SECURE else ""
 SESSION_COOKIE = f"{PREFIX}admin_session"
 CSRF_COOKIE = f"{PREFIX}admin_csrf"
 PREAUTH_COOKIE = f"{PREFIX}admin_preauth"
-LINK_TTL = timedelta(minutes=10)
-PREAUTH_MIN = 5
+
+PREAUTH_TTL = timedelta(minutes=5)
 ABSOLUTE = timedelta(hours=12)
 IDLE = timedelta(minutes=30)
-GENERIC_LINK = "If this email is authorized, a sign-in link has been sent."
-FAIL = "Sign-in failed. Please request a new link."
-_fernet = Fernet(base64.urlsafe_b64encode(hashlib.sha256(f"totp:{JWT_SECRET}".encode()).digest()))
+MAX_FAILURES = 5
+LOCK_FOR = timedelta(minutes=15)
+DELAY_BASE = float(os.environ.get("AUTH_DELAY_BASE_SECONDS", "0.25"))
+TOTP_PENDING_TTL = timedelta(minutes=10)
+
+INVALID = "Invalid credentials."
+INVALID_CODE = "Invalid code."
+STEP_EXPIRED = "Your sign-in step expired. Please sign in again."
+
+_fernet = Fernet(TOTP_ENCRYPTION_KEY.encode())
+_CODE_PEPPER = hashlib.sha256(f"recovery:{TOTP_ENCRYPTION_KEY}".encode()).digest()
+_SID_PEPPER = hashlib.sha256(f"sid:{JWT_SECRET}".encode()).digest()
 
 router = APIRouter(prefix="/api/admin-auth")
 
 
-def check_config() -> None:
-    """Refuse to start in production with missing or weak secrets."""
-    if APP_ENV != "production":
-        return
-    if len(JWT_SECRET) < 32 or len(TOKEN_PEPPER) < 32 or "@" not in ADMIN_EMAIL or len(ADMIN_PATH) < 8:
-        raise RuntimeError("Weak or missing admin auth configuration")
+# ---------------------------------------------------------------- helpers
+def _hmac(pepper: bytes, value: str) -> str:
+    return hmac.new(pepper, value.encode(), hashlib.sha256).hexdigest()
 
 
-def hmac_hash(value: str) -> str:
-    return hmac.new(TOKEN_PEPPER.encode(), value.encode(), hashlib.sha256).hexdigest()
+def sid_hash(sid: str) -> str:
+    return _hmac(_SID_PEPPER, sid)
+
+
+def code_hash(code: str) -> str:
+    return _hmac(_CODE_PEPPER, code.strip().lower())
+
+
+def encrypt(value: str) -> str:
+    return _fernet.encrypt(value.encode()).decode()
+
+
+def decrypt(value: str) -> str | None:
+    try:
+        return _fernet.decrypt(value.encode()).decode()
+    except (InvalidToken, AttributeError, ValueError):
+        return None
 
 
 async def log_event(kind: str, request: Request) -> None:
+    """Security audit trail: event type, time and hashed IP only (TTL 90 days)."""
     await db.security_events.insert_one({"type": kind, "timestamp": now(), "ip_hash": hash_key(client_ip(request))})
 
 
@@ -68,217 +87,348 @@ def _cookie(resp: Response, name: str, value: str, max_age: int, httponly: bool 
     resp.set_cookie(name, value, max_age=max_age, httponly=httponly, secure=COOKIE_SECURE, samesite="strict", path="/")
 
 
+def _clear(resp: Response, *names: str) -> None:
+    for name in names:
+        resp.delete_cookie(name, path="/", secure=COOKIE_SECURE, httponly=True, samesite="strict")
+
+
 def _jwt(payload: dict, ttl: timedelta) -> str:
-    return jwt.encode({**payload, "exp": now() + ttl}, JWT_SECRET, algorithm="HS256")
+    t = now()
+    return jwt.encode({**payload, "iat": t, "exp": t + ttl}, JWT_SECRET, algorithm="HS256")
 
 
 def _read(token: str | None, kind: str) -> dict | None:
+    if not token:
+        return None
     try:
-        data = jwt.decode(token or "", JWT_SECRET, algorithms=["HS256"])
+        data = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], options={"require": ["exp", "iat"]})
     except jwt.InvalidTokenError:
         return None
     return data if data.get("type") == kind else None
 
 
-async def create_session(request: Request, response: Response) -> None:
-    sid = secrets.token_urlsafe(32)
+# ---------------------------------------------------------------- lockout (per account and per IP)
+def _lock_keys(email: str, ip: str) -> list[str]:
+    return [f"acct:{hash_key(email)}", f"ip:{hash_key(ip)}"]
+
+
+async def _locked_for(email: str, ip: str) -> int:
+    """Seconds remaining on the longest active lock (0 if none)."""
     t = now()
-    await db.admin_sessions.insert_one({"session_id": hmac_hash(sid), "created_at": t, "last_seen_at": t,
-                                        "expires_at": t + ABSOLUTE, "ip_hash": hash_key(client_ip(request)), "revoked": False})
-    _cookie(response, SESSION_COOKIE, _jwt({"type": "session", "sid": sid}, ABSOLUTE), int(ABSOLUTE.total_seconds()))
-    _cookie(response, CSRF_COOKIE, secrets.token_urlsafe(24), int(ABSOLUTE.total_seconds()), httponly=False)
-    response.delete_cookie(PREAUTH_COOKIE, path="/", secure=COOKIE_SECURE, samesite="strict")
+    remaining = 0
+    user = await db.users.find_one({"email": email}, {"locked_until": 1})
+    stamps = [user.get("locked_until")] if user else []
+    async for doc in db.auth_lockouts.find({"key": {"$in": _lock_keys(email, ip)}}, {"locked_until": 1}):
+        stamps.append(doc.get("locked_until"))
+    for until in stamps:
+        if until:
+            until = until if until.tzinfo else until.replace(tzinfo=t.tzinfo)
+            if until > t:
+                remaining = max(remaining, int((until - t).total_seconds()) + 1)
+    return remaining
+
+
+def _lock_error(seconds: int) -> HTTPException:
+    minutes = max(1, -(-seconds // 60))
+    return HTTPException(status_code=429, detail=f"Too many attempts. Try again in {minutes} minute{'s' if minutes != 1 else ''}.",
+                         headers={"Retry-After": str(seconds)})
+
+
+async def _guard_locks(email: str, ip: str) -> None:
+    seconds = await _locked_for(email, ip)
+    if seconds:
+        raise _lock_error(seconds)
+
+
+async def _bump(collection, query: dict, t, upsert: bool) -> int:
+    doc = await collection.find_one(query) or {}
+    until = doc.get("locked_until")
+    if until is not None and (until if until.tzinfo else until.replace(tzinfo=t.tzinfo)) <= t:
+        doc["failed_attempts"] = 0
+    count = int(doc.get("failed_attempts") or 0) + 1
+    update = {"failed_attempts": count, "locked_until": t + LOCK_FOR if count >= MAX_FAILURES else None, "updated_at": t}
+    if doc or upsert:
+        await collection.update_one(query, {"$set": update}, upsert=upsert)
+    return count
+
+
+async def register_failure(email: str, ip: str, request: Request, kind: str, real_account: bool) -> None:
+    """Count the failure for the account and the IP, apply a progressive delay, lock after 5 failures."""
+    t = now()
+    acct_key, ip_key = _lock_keys(email, ip)
+    if real_account:
+        acct = await _bump(db.users, {"email": email}, t, upsert=False)
+    else:
+        acct = await _bump(db.auth_lockouts, {"key": acct_key}, t, upsert=True)
+    by_ip = await _bump(db.auth_lockouts, {"key": ip_key}, t, upsert=True)
+    await log_event(kind, request)
+    worst = max(acct, by_ip)
+    if worst >= MAX_FAILURES:
+        await log_event("lockout", request)
+    await asyncio.sleep(min(DELAY_BASE * (2 ** (worst - 1)), 3.0))
+
+
+async def clear_failures(email: str, ip: str) -> None:
+    await db.users.update_one({"email": email}, {"$set": {"failed_attempts": 0, "locked_until": None}})
+    await db.auth_lockouts.delete_many({"key": {"$in": _lock_keys(email, ip)}})
+
+
+# ---------------------------------------------------------------- sessions
+async def create_session(request: Request, response: Response, email: str) -> None:
+    """Issues a brand-new session id (rotation) and revokes the one presented by the browser, if any."""
+    old = _read(request.cookies.get(SESSION_COOKIE), "session")
+    if old:
+        await db.admin_sessions.update_one({"session_id": sid_hash(old["sid"])}, {"$set": {"revoked": True}})
+    sid, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+    t = now()
+    await db.admin_sessions.insert_one({
+        "session_id": sid_hash(sid), "user": email, "csrf_hash": sid_hash(csrf), "created_at": t, "last_seen_at": t,
+        "expires_at": t + ABSOLUTE, "ip_hash": hash_key(client_ip(request)), "revoked": False,
+    })
+    max_age = int(ABSOLUTE.total_seconds())
+    _cookie(response, SESSION_COOKIE, _jwt({"type": "session", "sid": sid}, ABSOLUTE), max_age)
+    _cookie(response, CSRF_COOKIE, csrf, max_age, httponly=False)
+    _clear(response, PREAUTH_COOKIE)
     await log_event("login_success", request)
 
 
-async def _active_session(request: Request) -> dict | None:
+async def active_session(request: Request) -> dict | None:
+    """Valid signature, stored, not revoked, not expired, idle timeout respected, user still an admin."""
     data = _read(request.cookies.get(SESSION_COOKIE), "session")
-    if not data:
+    if not data or not isinstance(data.get("sid"), str):
         return None
     t = now()
     doc = await db.admin_sessions.find_one_and_update(
-        {"session_id": hmac_hash(data["sid"]), "revoked": False, "expires_at": {"$gt": t}, "last_seen_at": {"$gt": t - IDLE}},
+        {"session_id": sid_hash(data["sid"]), "revoked": False, "expires_at": {"$gt": t}, "last_seen_at": {"$gt": t - IDLE}},
         {"$set": {"last_seen_at": t}},
+        projection={"_id": 0},
     )
-    return {"active": True} if doc else None
+    if not doc:
+        return None
+    user = await db.users.find_one({"email": doc.get("user")}, {"role": 1})
+    if not user or user.get("role") != "admin":
+        return None
+    return doc
 
 
-async def require_admin(request: Request) -> str:
-    """Single gate for every admin endpoint: signed cookie, live session, idle/absolute expiry and CSRF."""
-    if not await _active_session(request):
+@dataclass
+class AdminContext:
+    email: str
+    session_id: str
+
+
+async def require_admin(request: Request) -> AdminContext:
+    """The single authorization gate applied to every admin endpoint."""
+    session = await active_session(request)
+    if not session:
         raise HTTPException(status_code=401, detail="Not authenticated.")
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         cookie, header = request.cookies.get(CSRF_COOKIE, ""), request.headers.get("x-csrf-token", "")
-        if not cookie or not hmac.compare_digest(cookie, header):
+        if not cookie or not header or not hmac.compare_digest(cookie, header) \
+                or not hmac.compare_digest(sid_hash(header), session.get("csrf_hash", "")):
             raise HTTPException(status_code=403, detail="Forbidden.")
-    return ADMIN_EMAIL
+        await rate_limit("admin-mutation", client_ip(request), 60, 60)
+    return AdminContext(email=session["user"], session_id=session["session_id"])
 
 
-class EmailIn(BaseModel):
+# ---------------------------------------------------------------- request bodies
+class LoginIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    email: EmailStr
-
-
-class TokenIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    token: str = Field(min_length=20, max_length=200)
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=1, max_length=256)
 
 
 class CodeIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    code: str = Field(min_length=6, max_length=20)
+    code: str = Field(min_length=6, max_length=24)
 
 
-def _link_email(link: str, requested: str) -> str:
-    return (
-        '<table role="presentation" width="100%"><tr><td style="padding:24px;font-family:Arial,sans-serif;color:#0f172a">'
-        '<p style="font-size:18px;font-weight:bold">Your sign-in link</p>'
-        f'<p>A sign-in was requested on {requested} UTC. The link is valid for 10 minutes and works once.</p>'
-        f'<p><a href="{link}" style="color:#2f6bff">Open the studio sign-in page</a></p>'
-        '<p style="color:#64748b;font-size:13px">If you did not request this, ignore this message. Nothing will change.</p>'
-        "</td></tr></table>"
-    )
+class ChangePasswordIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=1, max_length=256)
+    confirm_password: str = Field(min_length=1, max_length=256)
 
 
-async def _deliver_link(token: str) -> None:
-    link = f"{PUBLIC_BASE_URL}{ADMIN_PATH}/verify#token={token}"
-    if APP_ENV == "development" and not HAS_EMAIL_KEY:
-        print(f"[dev] admin sign-in link: {link}", flush=True)
-        return
-    await send_email(to=ADMIN_EMAIL, subject="Sign-in link", html=_link_email(link, now().strftime("%Y-%m-%d %H:%M")))
-
-
-@router.post("/request-link")
-async def request_link(body: EmailIn, request: Request):
-    started = time.monotonic()
+# ---------------------------------------------------------------- login
+@router.post("/login")
+async def login(body: LoginIn, request: Request, response: Response):
     ip = client_ip(request)
-    await rate_limit("link-h", ip, 5, 3600)
-    await rate_limit("link-d", ip, 20, 86400)
-    await rate_limit("link-e", body.email.lower(), 5, 3600)
-    token = secrets.token_urlsafe(32)
-    token_hash = hmac_hash(token)
-    if hmac.compare_digest(body.email.strip().lower().encode(), ADMIN_EMAIL.encode()):
-        await db.admin_login_tokens.update_many({"used": False}, {"$set": {"used": True}})
-        await db.admin_login_tokens.insert_one({
-            "token_hash": token_hash, "created_at": now(), "expires_at": now() + LINK_TTL, "used": False,
-            "ip_hash": hash_key(ip), "user_agent_hash": hash_key(request.headers.get("user-agent", "")),
-        })
-        asyncio.create_task(_deliver_link(token))
-        await log_event("link_requested", request)
-    else:
-        await db.admin_login_tokens.find_one({"token_hash": token_hash})
-        await db.security_events.find_one({"type": "noop"})
-    await asyncio.sleep(max(0.0, 0.45 + random.uniform(0, 0.2) - (time.monotonic() - started)))
-    return {"message": GENERIC_LINK}
-
-
-@router.post("/verify-link")
-async def verify_link(body: TokenIn, request: Request, response: Response):
-    await rate_limit("verify", client_ip(request), 10, 3600)
-    doc = await db.admin_login_tokens.find_one_and_update(
-        {"token_hash": hmac_hash(body.token), "used": False, "expires_at": {"$gt": now()}},
-        {"$set": {"used": True, "used_at": now()}},
-        return_document=ReturnDocument.AFTER,
-    )
-    if not doc:
-        await log_event("link_rejected", request)
-        raise HTTPException(status_code=400, detail=FAIL)
-    await log_event("link_used", request)
+    await rate_limit("login", ip, 10, 3600)
+    email = body.email.strip().lower()
+    await _guard_locks(email, ip)
+    user = await db.users.find_one({"email": email})
+    ok = await asyncio.to_thread(verify_password, user.get("password_hash") if user else None, body.password)
+    if not ok or not user or user.get("role") != "admin":
+        await register_failure(email, ip, request, "login_failed", real_account=bool(user))
+        raise HTTPException(status_code=401, detail=INVALID)
+    await clear_failures(email, ip)
     if not REQUIRE_TOTP:
-        await create_session(request, response)
+        await create_session(request, response, email)
         return {"next": "done"}
-    _cookie(response, PREAUTH_COOKIE, _jwt({"type": "preauth", "n": secrets.token_hex(8)}, timedelta(minutes=PREAUTH_MIN)), PREAUTH_MIN * 60)
-    sec = await db.admin_security.find_one({"_id": "admin"}) or {}
-    return {"next": "totp_verify" if sec.get("totp_enabled") else "totp_setup"}
+    await log_event("login_password_ok", request)
+    token = _jwt({"type": "preauth", "sub": email, "jti": secrets.token_hex(8)}, PREAUTH_TTL)
+    _cookie(response, PREAUTH_COOKIE, token, int(PREAUTH_TTL.total_seconds()))
+    return {"next": "totp_verify" if user.get("totp_enabled") else "totp_setup"}
 
 
-def _require_preauth(request: Request) -> None:
-    if not _read(request.cookies.get(PREAUTH_COOKIE), "preauth"):
-        raise HTTPException(status_code=401, detail="Your sign-in step expired. Please request a new link.")
-
-
-async def _totp_guard(request: Request) -> None:
-    since = now() - timedelta(minutes=15)
-    if await db.security_events.count_documents({"type": "totp_failed", "timestamp": {"$gt": since}}) >= 5:
-        await log_event("lockout", request)
-        raise HTTPException(status_code=429, detail="Too many attempts. Please wait 15 minutes.")
+async def _preauth_user(request: Request) -> dict:
+    data = _read(request.cookies.get(PREAUTH_COOKIE), "preauth")
+    user = await db.users.find_one({"email": data.get("sub")}) if data else None
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=401, detail=STEP_EXPIRED)
+    return user
 
 
 def _qr(uri: str) -> str:
+    """QR code rendered locally (no third-party QR service)."""
     buf = io.BytesIO()
     qrcode.make(uri, box_size=6, border=2).save(buf, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
+def _new_recovery_code() -> str:
+    raw = secrets.token_hex(8)
+    return "-".join(raw[i:i + 4] for i in range(0, 16, 4))
+
+
+async def _match_totp(email: str, secret: str, code: str) -> bool:
+    """6-digit code, +/-1 time step, each time step usable only once."""
+    if len(code) != 6 or not code.isdigit():
+        return False
+    totp = pyotp.TOTP(secret)
+    current = int(time.time()) // 30
+    for counter in (current - 1, current, current + 1):
+        if hmac.compare_digest(totp.at(counter * 30), code):
+            try:
+                await db.totp_used.insert_one({"key": hash_key(f"{email}:{counter}"), "at": now()})
+            except DuplicateKeyError:
+                return False
+            return True
+    return False
+
+
+# ---------------------------------------------------------------- TOTP
 @router.post("/totp/setup")
 async def totp_setup(request: Request):
-    _require_preauth(request)
-    sec = await db.admin_security.find_one({"_id": "admin"}) or {}
-    if sec.get("totp_enabled"):
-        raise HTTPException(status_code=400, detail=FAIL)
+    user = await _preauth_user(request)
+    if user.get("totp_enabled"):
+        raise HTTPException(status_code=400, detail="Two-factor authentication is already set up.")
+    await _guard_locks(user["email"], client_ip(request))
+    await rate_limit("totp-setup", client_ip(request), 10, 600)
     secret = pyotp.random_base32()
-    codes = [f"{secrets.token_hex(2)}-{secrets.token_hex(2)}" for _ in range(8)]
-    await db.admin_security.update_one({"_id": "admin"}, {"$set": {
-        "pending_secret_encrypted": _fernet.encrypt(secret.encode()).decode(),
-        "pending_recovery_hashed": [hmac_hash(c) for c in codes], "updated_at": now()}}, upsert=True)
-    uri = pyotp.TOTP(secret).provisioning_uri(name=ADMIN_EMAIL, issuer_name="Alex Cearnau Studio")
-    return {"qr": _qr(uri), "secret": secret, "recovery_codes": codes}
+    codes = [_new_recovery_code() for _ in range(8)]
+    await db.totp_pending.update_one({"user": user["email"]}, {"$set": {
+        "secret_encrypted": encrypt(secret), "recovery_hashed": [code_hash(c) for c in codes], "created_at": now()}}, upsert=True)
+    uri = pyotp.TOTP(secret).provisioning_uri(name=user["email"], issuer_name="Alex Cearnau Studio")
+    return {"qr": _qr(uri), "secret": secret, "otpauth_uri": uri, "recovery_codes": codes}
 
 
 @router.post("/totp/confirm")
 async def totp_confirm(body: CodeIn, request: Request, response: Response):
-    _require_preauth(request)
-    await _totp_guard(request)
-    sec = await db.admin_security.find_one({"_id": "admin"}) or {}
-    pending = sec.get("pending_secret_encrypted")
-    if sec.get("totp_enabled") or not pending or not pyotp.TOTP(_fernet.decrypt(pending.encode()).decode()).verify(body.code, valid_window=1):
-        await log_event("totp_failed", request)
-        raise HTTPException(status_code=401, detail="That code did not work. Try the next one.")
-    await db.admin_security.update_one({"_id": "admin"}, {
-        "$set": {"totp_secret_encrypted": pending, "totp_enabled": True, "recovery_codes_hashed": sec["pending_recovery_hashed"],
-                 "last_code": body.code, "updated_at": now()},
-        "$unset": {"pending_secret_encrypted": "", "pending_recovery_hashed": ""}})
-    await create_session(request, response)
+    user = await _preauth_user(request)
+    ip = client_ip(request)
+    await rate_limit("totp", ip, 5, 600)
+    await _guard_locks(user["email"], ip)
+    pending = await db.totp_pending.find_one({"user": user["email"]})
+    secret = decrypt(pending["secret_encrypted"]) if pending else None
+    if user.get("totp_enabled") or not secret or not await _match_totp(user["email"], secret, body.code.strip()):
+        await register_failure(user["email"], ip, request, "totp_failed", real_account=True)
+        raise HTTPException(status_code=401, detail=INVALID_CODE)
+    await db.users.update_one({"email": user["email"]}, {"$set": {
+        "totp_secret_encrypted": pending["secret_encrypted"], "totp_enabled": True,
+        "recovery_codes_hashed": pending["recovery_hashed"], "updated_at": now()}})
+    await db.totp_pending.delete_one({"user": user["email"]})
+    await clear_failures(user["email"], ip)
+    await log_event("totp_enabled", request)
+    await create_session(request, response, user["email"])
     return {"authenticated": True}
 
 
 @router.post("/totp/verify")
 async def totp_verify(body: CodeIn, request: Request, response: Response):
-    _require_preauth(request)
-    await _totp_guard(request)
-    sec = await db.admin_security.find_one({"_id": "admin"}) or {}
-    if not sec.get("totp_enabled"):
-        raise HTTPException(status_code=400, detail=FAIL)
+    user = await _preauth_user(request)
+    ip = client_ip(request)
+    await rate_limit("totp", ip, 5, 600)
+    await _guard_locks(user["email"], ip)
+    if not user.get("totp_enabled"):
+        raise HTTPException(status_code=400, detail=STEP_EXPIRED)
     code = body.code.strip().lower()
-    if len(code) == 6 and code.isdigit():
-        secret = _fernet.decrypt(sec["totp_secret_encrypted"].encode()).decode()
-        ok = code != sec.get("last_code") and pyotp.TOTP(secret).verify(code, valid_window=1)
-        if ok:
-            await db.admin_security.update_one({"_id": "admin"}, {"$set": {"last_code": code}})
-    else:
-        ok = (await db.admin_security.update_one(
-            {"_id": "admin", "recovery_codes_hashed": hmac_hash(code)},
-            {"$pull": {"recovery_codes_hashed": hmac_hash(code)}})).modified_count == 1
-        if ok:
-            await db.admin_sessions.update_many({}, {"$set": {"revoked": True}})
-            await log_event("recovery_code_used", request)
+    secret = decrypt(user.get("totp_secret_encrypted") or "")
+    ok = bool(secret) and await _match_totp(user["email"], secret, code)
+    recovery = False
+    if not ok and len(code) != 6:
+        hashed = code_hash(code)
+        res = await db.users.update_one({"email": user["email"], "recovery_codes_hashed": hashed},
+                                        {"$pull": {"recovery_codes_hashed": hashed}, "$set": {"updated_at": now()}})
+        ok = recovery = res.modified_count == 1
     if not ok:
-        await log_event("totp_failed", request)
-        raise HTTPException(status_code=401, detail="That code did not work. Try the next one.")
-    await create_session(request, response)
+        await register_failure(user["email"], ip, request, "totp_failed", real_account=True)
+        raise HTTPException(status_code=401, detail=INVALID_CODE)
+    await clear_failures(user["email"], ip)
+    if recovery:
+        await db.admin_sessions.update_many({"user": user["email"]}, {"$set": {"revoked": True}})
+        await log_event("recovery_code_used", request)
+    else:
+        await log_event("totp_verified", request)
+    await create_session(request, response, user["email"])
     return {"authenticated": True}
 
 
+# ---------------------------------------------------------------- session management
 @router.get("/session")
 async def session(request: Request):
-    return {"authenticated": bool(await _active_session(request))}
+    return {"authenticated": bool(await active_session(request))}
 
 
 @router.post("/logout")
-async def logout(request: Request, response: Response, _: str = Depends(require_admin)):
+async def logout(request: Request, response: Response):
+    """Revokes the presented session and clears cookies. Requires the CSRF double-submit token."""
+    cookie, header = request.cookies.get(CSRF_COOKIE, ""), request.headers.get("x-csrf-token", "")
     data = _read(request.cookies.get(SESSION_COOKIE), "session")
-    await db.admin_sessions.update_one({"session_id": hmac_hash(data["sid"])}, {"$set": {"revoked": True}})
-    for name in (SESSION_COOKIE, CSRF_COOKIE, PREAUTH_COOKIE):
-        response.delete_cookie(name, path="/", secure=COOKIE_SECURE, samesite="strict")
-    await log_event("logout", request)
+    if data:
+        if not cookie or not header or not hmac.compare_digest(cookie, header):
+            raise HTTPException(status_code=403, detail="Forbidden.")
+        await db.admin_sessions.update_one({"session_id": sid_hash(data["sid"])}, {"$set": {"revoked": True}})
+        await log_event("logout", request)
+    _clear(response, SESSION_COOKIE, CSRF_COOKIE, PREAUTH_COOKIE)
     return {"ok": True}
+
+
+@router.post("/change-password")
+async def change_password(body: ChangePasswordIn, request: Request, admin: AdminContext = Depends(require_admin)):
+    ip = client_ip(request)
+    await _guard_locks(admin.email, ip)
+    user = await db.users.find_one({"email": admin.email})
+    if not await asyncio.to_thread(verify_password, user.get("password_hash"), body.current_password):
+        await register_failure(admin.email, ip, request, "password_change_failed", real_account=True)
+        raise HTTPException(status_code=400, detail="The current password is incorrect.")
+    if body.new_password != body.confirm_password:
+        raise HTTPException(status_code=422, detail="The new passwords do not match.")
+    problem = policy_error(body.new_password, admin.email)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=422, detail="The new password must be different from the current one.")
+    new_hash = await asyncio.to_thread(hash_password, body.new_password)
+    await db.users.update_one({"email": admin.email}, {"$set": {"password_hash": new_hash, "updated_at": now()}})
+    revoked = await db.admin_sessions.update_many({"user": admin.email, "session_id": {"$ne": admin.session_id}},
+                                                  {"$set": {"revoked": True}})
+    await clear_failures(admin.email, ip)
+    await log_event("password_changed", request)
+    return {"ok": True, "other_sessions_revoked": revoked.modified_count}
+
+
+@router.get("/settings")
+async def settings(admin: AdminContext = Depends(require_admin)):
+    user = await db.users.find_one({"email": admin.email})
+    weak_initial = bool(ADMIN_INITIAL_PASSWORD) and is_weak(ADMIN_INITIAL_PASSWORD) and await asyncio.to_thread(
+        verify_password, user.get("password_hash"), ADMIN_INITIAL_PASSWORD)
+    return {
+        "email": admin.email,
+        "totp_required": REQUIRE_TOTP,
+        "totp_enabled": bool(user.get("totp_enabled")),
+        "recovery_codes_remaining": len(user.get("recovery_codes_hashed") or []),
+        "weak_initial_password": weak_initial,
+        "idle_timeout_seconds": int(IDLE.total_seconds()),
+    }

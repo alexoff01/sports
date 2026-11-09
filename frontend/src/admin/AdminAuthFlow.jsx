@@ -1,37 +1,79 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, MailCheck, ShieldCheck } from "lucide-react";
+import { Check, Copy, Download, Eye, EyeOff, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { Logo } from "@/components/site/Logo";
+import { BTN, LABEL } from "@/admin/ui";
 
-const BTN = "inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-sm border border-volt bg-volt px-6 font-display text-base font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-volt-bright disabled:opacity-60";
-const LABEL = "mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-300";
+const fmtWait = (s) => (s >= 60 ? `${Math.ceil(s / 60)} min` : `${s} s`);
 
-const friendly = (err, fallback) => {
-  const status = err?.response?.status;
-  if (!err?.response) return "You seem to be offline or the server is unreachable. Please try again.";
-  if (status === 429) return "Too many attempts. Please wait a while before trying again.";
-  if (status === 400) return "This sign-in link has expired or was already used. Please request a new one.";
-  const detail = err.response.data?.detail;
-  return [401].includes(status) && typeof detail === "string" ? detail : fallback;
+const readError = (err, fallback) => {
+  if (!err?.response) return { message: "You seem to be offline or the server is unreachable. Please try again." };
+  const { status, data, headers } = err.response;
+  if (status === 429) {
+    const wait = Number(headers?.["retry-after"]) || 0;
+    return { message: typeof data?.detail === "string" ? data.detail : "Too many attempts.", lockedFor: wait };
+  }
+  if (status === 401 || status === 400) return { message: typeof data?.detail === "string" ? data.detail : fallback, expired: /expired/i.test(data?.detail ?? "") };
+  if (status === 422) return { message: fallback };
+  return { message: fallback };
 };
 
-const readFragmentToken = () => {
-  const match = window.location.hash.match(/token=([A-Za-z0-9_-]+)/);
-  if (window.location.hash) window.history.replaceState(null, "", window.location.pathname);
-  return match ? match[1] : null;
-};
+const CodeInput = ({ recovery, value, onChange }) => (
+  <div>
+    <label htmlFor="a-code" className={LABEL}>{recovery ? "Recovery code" : "6-digit code from your authenticator"}</label>
+    <input
+      id="a-code"
+      name="one-time-code"
+      autoFocus
+      inputMode={recovery ? "text" : "numeric"}
+      pattern={recovery ? undefined : "[0-9]{6}"}
+      autoComplete="one-time-code"
+      required
+      maxLength={recovery ? 19 : 6}
+      className="field text-center font-mono text-2xl tracking-[0.4em]"
+      value={value}
+      onChange={(e) => onChange(recovery ? e.target.value.trim() : e.target.value.replace(/\D/g, ""))}
+      data-testid="admin-totp-input"
+    />
+  </div>
+);
 
-// Passwordless admin sign-in: email link, confirm, then TOTP setup or verification.
-export const AdminAuthFlow = ({ verifyMode, onAuthed }) => {
-  const token = useRef(verifyMode ? readFragmentToken() : null);
-  const [step, setStep] = useState(verifyMode ? (token.current ? "confirm" : "email") : "email");
+// Email + password, then mandatory two-factor (first sign-in: setup; afterwards: verify).
+export const AdminAuthFlow = ({ onAuthed, notice }) => {
+  const [step, setStep] = useState("login");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [code, setCode] = useState("");
   const [setup, setSetup] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState("");
   const [useRecovery, setUseRecovery] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(verifyMode && !token.current ? "This sign-in link is incomplete. Please request a new one." : "");
+  const [error, setError] = useState("");
+  const [lockedUntil, setLockedUntil] = useState(0);
+  const [, force] = useState(0);
+  const heading = useRef(null);
+
+  const lockLeft = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
+  useEffect(() => {
+    if (!lockLeft) return undefined;
+    const t = setInterval(() => force((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [lockLeft]);
+
+  useEffect(() => {
+    heading.current?.focus();
+  }, [step]);
+
+  const restart = (message) => {
+    setStep("login");
+    setPassword("");
+    setCode("");
+    setSetup(null);
+    setSaved(false);
+    setError(message);
+  };
 
   const run = async (fn, fallback) => {
     setBusy(true);
@@ -39,102 +81,146 @@ export const AdminAuthFlow = ({ verifyMode, onAuthed }) => {
     try {
       await fn();
     } catch (err) {
-      setError(friendly(err, fallback));
-      if (err?.response?.status === 401 && /expired/i.test(err.response.data?.detail ?? "")) setStep("email");
+      const e = readError(err, fallback);
+      if (e.lockedFor) setLockedUntil(Date.now() + e.lockedFor * 1000);
+      if (e.expired && step !== "login") restart(e.message);
+      else setError(e.message);
     } finally {
       setBusy(false);
     }
   };
 
   useEffect(() => {
-    if (step !== "totp_setup" || setup) return undefined;
-    run(async () => setSetup((await api.post("/admin-auth/totp/setup")).data), "Setup could not start. Please request a new link.");
-    return undefined;
-  }, [step, setup]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (step !== "totp_setup" || setup) return;
+    run(async () => setSetup((await api.post("/admin-auth/totp/setup")).data), "Two-factor setup could not start. Please sign in again.");
+  }, [step, setup]);
 
-  const sendLink = (e) => {
+  const submitLogin = (e) => {
     e.preventDefault();
     run(async () => {
-      await api.post("/admin-auth/request-link", { email });
-      setStep("sent");
-    }, "The request could not be sent. Please try again.");
-  };
-  const confirmLink = () =>
-    run(async () => {
-      const { data } = await api.post("/admin-auth/verify-link", { token: token.current });
-      token.current = null;
+      const { data } = await api.post("/admin-auth/login", { email: email.trim(), password });
+      setPassword("");
       if (data.next === "done") onAuthed();
       else setStep(data.next);
-    }, "Sign-in failed. Please request a new link.");
+    }, "Invalid credentials.");
+  };
+
   const submitCode = (e) => {
     e.preventDefault();
     const path = step === "totp_setup" ? "/admin-auth/totp/confirm" : "/admin-auth/totp/verify";
     run(async () => {
       await api.post(path, { code: code.trim() });
+      setSetup(null);
       onAuthed();
-    }, "That code did not work.");
+    }, "Invalid code.");
   };
 
+  const copy = async (text, what) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(what);
+      setTimeout(() => setCopied(""), 2000);
+    } catch {
+      setCopied("");
+    }
+  };
+
+  const downloadCodes = () => {
+    const blob = new Blob([`Studio recovery codes (each works once)\n\n${setup.recovery_codes.join("\n")}\n`], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "studio-recovery-codes.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const locked = lockLeft > 0;
+  const titles = { login: "Studio sign in", totp_setup: "Set up two-factor", totp_verify: "Two-factor check" };
+
   return (
-    <main className="grid min-h-screen place-items-center px-5 py-16">
-      <div className="w-full max-w-md border border-line bg-ink-900 p-8" data-testid="admin-login-card">
+    <main className="grid min-h-screen place-items-center px-4 py-10 sm:px-5 sm:py-16">
+      <div className={`w-full ${step === "totp_setup" ? "max-w-xl" : "max-w-md"} border border-line bg-ink-900 p-6 sm:p-8`} data-testid="admin-login-card">
         <div className="flex flex-col items-start gap-5">
           <Logo height="h-10" testId="admin-login-logo-link" />
-          <h1 className="font-display text-2xl font-extrabold uppercase tracking-[0.08em]">Studio sign in</h1>
+          <h1 ref={heading} tabIndex={-1} className="font-display text-2xl font-extrabold uppercase tracking-[0.08em] focus:outline-none" data-testid="admin-auth-title">{titles[step]}</h1>
         </div>
+        {notice && step === "login" && !error && <p className="mt-4 border-l-2 border-volt pl-3 text-sm text-slate-300" data-testid="admin-auth-notice">{notice}</p>}
 
-        {step === "email" && (
-          <form onSubmit={sendLink} className="mt-8 space-y-5" data-testid="admin-email-form">
+        {step === "login" && (
+          <form onSubmit={submitLogin} className="mt-8 space-y-5" data-testid="admin-login-form" noValidate={false}>
             <div>
               <label htmlFor="a-email" className={LABEL}>Email</label>
-              <input id="a-email" type="email" autoComplete="email" required className="field" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="admin-email-input" />
+              <input id="a-email" name="username" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={254} className="field" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="admin-email-input" />
             </div>
-            <button type="submit" disabled={busy} className={BTN} data-testid="admin-send-link-btn">{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}Send sign-in link</button>
+            <div>
+              <label htmlFor="a-password" className={LABEL}>Password</label>
+              <div className="relative">
+                <input id="a-password" name="password" type={showPw ? "text" : "password"} autoComplete="current-password" required maxLength={256} className="field pr-14" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="admin-password-input" />
+                <button type="button" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Hide password" : "Show password"} aria-pressed={showPw} className="absolute inset-y-0 right-0 grid w-12 place-items-center text-slate-300 hover:text-white" data-testid="admin-password-toggle">
+                  {showPw ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
+                </button>
+              </div>
+            </div>
+            <button type="submit" disabled={busy || locked || !email || !password} className={BTN} data-testid="admin-login-submit">
+              {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {locked ? `Locked · ${fmtWait(lockLeft)}` : "Sign in"}
+            </button>
           </form>
         )}
 
-        {step === "sent" && (
-          <div className="mt-8 space-y-4" data-testid="admin-link-sent">
-            <MailCheck className="h-8 w-8 text-volt-bright" aria-hidden="true" />
-            <p className="text-slate-200">If this email is authorized, a sign-in link has been sent. It is valid for 10 minutes and works once.</p>
-            <button type="button" onClick={() => setStep("email")} className="min-h-[44px] text-sm text-volt-bright">Use a different email</button>
-          </div>
-        )}
-
-        {step === "confirm" && (
-          <div className="mt-8 space-y-5" data-testid="admin-confirm-step">
-            <p className="text-slate-200">Confirm that you want to sign in on this device.</p>
-            <button type="button" onClick={confirmLink} disabled={busy} className={BTN} data-testid="admin-confirm-btn">{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}Confirm sign-in</button>
-          </div>
-        )}
-
-        {(step === "totp_setup" || step === "totp_verify") && (
-          <form onSubmit={submitCode} className="mt-8 space-y-5" data-testid="admin-totp-form">
-            {step === "totp_setup" && setup && (
-              <div className="space-y-4" data-testid="admin-totp-setup">
-                <p className="flex gap-2 text-sm text-slate-300"><ShieldCheck className="h-5 w-5 shrink-0 text-volt-bright" aria-hidden="true" />Scan this code with an authenticator app, then enter the 6-digit code.</p>
-                <img src={setup.qr} alt="Authenticator setup QR code" className="mx-auto h-48 w-48 bg-white p-2" />
-                <p className="break-all text-center font-mono text-xs text-slate-300" data-testid="admin-totp-secret">{setup.secret}</p>
-                <div className="border border-line p-4">
-                  <p className={LABEL}>Recovery codes (shown once)</p>
-                  <ul className="grid grid-cols-2 gap-2 font-mono text-sm" data-testid="admin-recovery-codes">{setup.recovery_codes.map((c) => <li key={c}>{c}</li>)}</ul>
+        {step === "totp_setup" && (
+          <form onSubmit={submitCode} className="mt-8 space-y-6" data-testid="admin-totp-form">
+            {!setup ? (
+              <div className="grid h-48 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-volt" aria-label="Preparing setup" /></div>
+            ) : (
+              <div className="space-y-6" data-testid="admin-totp-setup">
+                <p className="flex gap-2 text-sm text-slate-300"><ShieldCheck className="h-5 w-5 shrink-0 text-volt-bright" aria-hidden="true" />Two-factor authentication is required. Scan the code with an authenticator app (for example Google Authenticator, 1Password or Authy).</p>
+                <div className="grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
+                  <img src={setup.qr} alt="Authenticator setup QR code" className="mx-auto h-44 w-44 bg-white p-2" data-testid="admin-totp-qr" />
+                  <div>
+                    <p className={LABEL}>Or enter this key manually</p>
+                    <p className="break-all font-mono text-sm text-paper" data-testid="admin-totp-secret">{setup.secret.match(/.{1,4}/g).join(" ")}</p>
+                    <button type="button" onClick={() => copy(setup.secret, "key")} className="mt-2 inline-flex min-h-[44px] items-center gap-2 text-sm text-volt-bright" data-testid="admin-totp-copy-key">
+                      {copied === "key" ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}{copied === "key" ? "Copied" : "Copy key"}
+                    </button>
+                  </div>
                 </div>
-                <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} className="accent-[#2F6BFF]" data-testid="admin-codes-saved" />I saved these recovery codes</label>
+                <div className="border border-line-strong bg-ink-950/60 p-4">
+                  <p className={`${LABEL} flex items-center gap-2`}><KeyRound className="h-4 w-4 text-volt-bright" aria-hidden="true" />Recovery codes · shown only once</p>
+                  <p className="mb-3 text-xs text-slate-400">Each code works once if you lose your phone. Store them somewhere safe and offline.</p>
+                  <ul className="grid grid-cols-1 gap-2 font-mono text-sm sm:grid-cols-2" data-testid="admin-recovery-codes">{setup.recovery_codes.map((c) => <li key={c} className="border border-line px-3 py-2">{c}</li>)}</ul>
+                  <div className="mt-3 flex flex-wrap gap-4">
+                    <button type="button" onClick={() => copy(setup.recovery_codes.join("\n"), "codes")} className="inline-flex min-h-[44px] items-center gap-2 text-sm text-volt-bright" data-testid="admin-codes-copy">
+                      {copied === "codes" ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}{copied === "codes" ? "Copied" : "Copy codes"}
+                    </button>
+                    <button type="button" onClick={downloadCodes} className="inline-flex min-h-[44px] items-center gap-2 text-sm text-volt-bright" data-testid="admin-codes-download"><Download className="h-4 w-4" aria-hidden="true" />Download .txt</button>
+                  </div>
+                </div>
+                <label className="flex min-h-[44px] items-center gap-3 text-sm"><input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} className="h-5 w-5 accent-[#2F6BFF]" data-testid="admin-codes-saved" />I saved these recovery codes</label>
+                <CodeInput recovery={false} value={code} onChange={setCode} />
+                <button type="submit" disabled={busy || locked || !saved || code.length !== 6} className={BTN} data-testid="admin-totp-submit">{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{locked ? `Locked · ${fmtWait(lockLeft)}` : "Activate and sign in"}</button>
               </div>
             )}
-            <div>
-              <label htmlFor="a-code" className={LABEL}>{useRecovery ? "Recovery code" : "Authenticator code"}</label>
-              <input id="a-code" autoFocus inputMode={useRecovery ? "text" : "numeric"} autoComplete="one-time-code" required maxLength={useRecovery ? 9 : 6} className="field text-center font-mono text-2xl tracking-[0.4em]" value={code} onChange={(e) => setCode(e.target.value)} data-testid="admin-totp-input" />
-            </div>
-            <button type="submit" disabled={busy || (step === "totp_setup" && (!setup || !saved))} className={BTN} data-testid="admin-totp-submit">{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}Verify</button>
-            {step === "totp_verify" && (
+          </form>
+        )}
+
+        {step === "totp_verify" && (
+          <form onSubmit={submitCode} className="mt-8 space-y-5" data-testid="admin-totp-form">
+            <CodeInput recovery={useRecovery} value={code} onChange={setCode} />
+            <button type="submit" disabled={busy || locked || (!useRecovery && code.length !== 6) || (useRecovery && code.length < 8)} className={BTN} data-testid="admin-totp-submit">{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{locked ? `Locked · ${fmtWait(lockLeft)}` : "Verify"}</button>
+            <div className="flex flex-wrap justify-between gap-2">
               <button type="button" onClick={() => { setUseRecovery((v) => !v); setCode(""); }} className="min-h-[44px] text-sm text-volt-bright" data-testid="admin-recovery-toggle">
                 {useRecovery ? "Use authenticator code" : "Use a recovery code"}
               </button>
-            )}
+              <button type="button" onClick={() => restart("")} className="min-h-[44px] text-sm text-slate-400 hover:text-white" data-testid="admin-back-to-login">Back to sign in</button>
+            </div>
           </form>
         )}
-        <p role="alert" aria-live="assertive" className="mt-4 min-h-[1.5rem] text-sm text-red-300" data-testid="admin-login-error">{error}</p>
+        <p role="alert" aria-live="assertive" className="mt-4 min-h-[1.5rem] text-sm text-red-300" data-testid="admin-login-error">
+          {error}
+          {locked && error && <span className="block text-slate-400" data-testid="admin-lockout-remaining">Time remaining: {fmtWait(lockLeft)}</span>}
+        </p>
       </div>
     </main>
   );

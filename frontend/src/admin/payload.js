@@ -9,6 +9,7 @@ export const toPayload = (p) => ({
   cover_image: p.cover_image ?? "",
   cover_alt: p.cover_alt ?? "",
   gallery: p.gallery ?? [],
+  videos: p.videos ?? [],
   context: p.context ?? "",
   objective: p.objective ?? "",
   strategy: p.strategy ?? "",

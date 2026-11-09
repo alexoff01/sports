@@ -2,19 +2,16 @@ import hashlib
 import os
 import re
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
-from dotenv import load_dotenv
 from fastapi import HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorClient
 
-load_dotenv(Path(__file__).parent / ".env")
+from config import ALLOWED_ORIGINS, JWT_SECRET  # noqa: F401  (loads backend/.env first)
 
 client = AsyncIOMotorClient(os.environ["MONGO_URL"])
 db = client[os.environ["DB_NAME"]]
 
-ALLOWED_ORIGINS = [o.strip().rstrip("/") for o in os.environ["CORS_ORIGINS"].split(",") if o.strip()]
-_HASH_SALT = os.environ["JWT_SECRET"]
+_HASH_SALT = JWT_SECRET
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
@@ -42,5 +39,6 @@ async def rate_limit(bucket: str, key: str, limit: int, window_s: int) -> None:
     k = f"{bucket}:{hash_key(key)}"
     since = now() - timedelta(seconds=window_s)
     if await db.rate_limits.count_documents({"k": k, "at": {"$gte": since}}) >= limit:
-        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.",
+                            headers={"Retry-After": str(window_s)})
     await db.rate_limits.insert_one({"k": k, "at": now()})

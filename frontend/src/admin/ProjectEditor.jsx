@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowLeft, Plus, X } from "lucide-react";
+import { ArrowLeft, Film, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage, mediaUrl } from "@/lib/api";
 import { ProjectCard } from "@/components/site/ProjectCard";
 import { ImageDrop } from "@/admin/ImageDrop";
+import { VideoDrop } from "@/admin/VideoDrop";
 import { slugify, toPayload } from "@/admin/payload";
 
 const CATEGORIES = ["Content Creation", "Strategy", "Video"];
@@ -31,12 +32,29 @@ export const ProjectEditor = ({ project, onClose }) => {
   const [tagText, setTagText] = useState((project?.tags ?? []).join(", "));
   const [slugTouched, setSlugTouched] = useState(Boolean(project));
   const [saving, setSaving] = useState(false);
+  const [showMissing, setShowMissing] = useState(false);
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v, ...(k === "title" && !slugTouched ? { slug: slugify(v) } : {}) }));
 
   const togglePlatform = (pl) => set("platforms")(form.platforms.includes(pl) ? form.platforms.filter((x) => x !== pl) : [...form.platforms, pl]);
   const setCaption = (i, key, v) => set("captions")(form.captions.map((c, j) => (j === i ? { ...c, [key]: v } : c)));
 
+  const missing = [
+    form.title.trim().length < 3 && "Title (at least 3 characters)",
+    !form.slug && "Slug",
+    form.label.trim().length < 2 && "Label",
+    form.summary.trim().length < 10 && "Short description (at least 10 characters)",
+    !form.cover_image && "Cover image",
+    form.cover_alt.trim().length < 5 && "Cover alt text (at least 5 characters)",
+    ...STEPS.filter(([k]) => form[k].trim().length < 10).map(([, l]) => `${l} (at least 10 characters)`),
+    form.platforms.length === 0 && "At least one platform",
+    form.captions.some((c) => c.text.trim().length < 2) && "Every caption needs text",
+  ].filter(Boolean);
+
   const save = async () => {
+    if (missing.length) {
+      setShowMissing(true);
+      return;
+    }
     setSaving(true);
     const body = { ...form, tags: tagText.split(",").map((t) => t.trim()).filter(Boolean) };
     try {
@@ -83,6 +101,20 @@ export const ProjectEditor = ({ project, onClose }) => {
             </div>
             <ImageDrop multiple testId="editor-gallery-drop" onUploaded={(url) => setForm((f) => ({ ...f, gallery: [...f.gallery, url].slice(0, 8) }))} />
           </div>
+          <div>
+            <p className={LABEL}>Videos (optional)</p>
+            {form.videos.length > 0 && (
+              <ul className="mb-3 space-y-2" data-testid="editor-video-list">
+                {form.videos.map((v, i) => (
+                  <li key={v} className="flex items-center justify-between gap-3 border border-line px-3 py-2 text-sm">
+                    <span className="inline-flex items-center gap-2 truncate"><Film className="h-4 w-4 shrink-0 text-volt-bright" aria-hidden="true" />Video {i + 1}</span>
+                    <button type="button" aria-label={`Remove video ${i + 1}`} onClick={() => set("videos")(form.videos.filter((x) => x !== v))} className="grid h-9 w-9 place-items-center border border-line"><X className="h-4 w-4" /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {form.videos.length < 4 && <VideoDrop testId="editor-video-drop" onUploaded={(url) => setForm((f) => ({ ...f, videos: [...f.videos, url].slice(0, 4) }))} />}
+          </div>
           {STEPS.map(([k, l]) => <Text key={k} id={k} label={l} value={form[k]} onChange={set(k)} area maxLength={3000} />)}
           <fieldset>
             <legend className={LABEL}>Platforms</legend>
@@ -107,6 +139,12 @@ export const ProjectEditor = ({ project, onClose }) => {
             <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={form.published} onChange={(e) => set("published")(e.target.checked)} className="accent-[#2F6BFF]" data-testid="editor-published" />Published</label>
             <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={form.featured} onChange={(e) => set("featured")(e.target.checked)} className="accent-[#2F6BFF]" data-testid="editor-featured" />Featured on Home</label>
           </div>
+          {showMissing && missing.length > 0 && (
+            <div role="alert" className="border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-100" data-testid="editor-missing">
+              <p className="font-semibold">Please complete before saving:</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">{missing.map((m) => <li key={m}>{m}</li>)}</ul>
+            </div>
+          )}
           <button type="submit" disabled={saving} className="inline-flex min-h-[52px] items-center border border-volt bg-volt px-8 font-display font-bold uppercase tracking-[0.14em] disabled:opacity-60" data-testid="editor-save-btn">{saving ? "Saving…" : "Save project"}</button>
         </form>
         <aside className="xl:col-span-5" aria-label="Live preview">

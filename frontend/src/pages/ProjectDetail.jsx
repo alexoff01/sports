@@ -9,6 +9,7 @@ import { TypeBadge } from "@/components/site/ProjectCard";
 import { CtaBand } from "@/components/site/CtaBand";
 import { PhoneMockup } from "@/components/project/PhoneMockup";
 import NotFound from "@/pages/NotFound";
+import { mediaUrl } from "@/lib/api";
 import { PitchDivider } from "@/components/football/PitchDivider";
 import { DriftMotif } from "@/components/football/Atmosphere";
 import { WhistleIcon } from "@/components/football/motifs";
@@ -100,6 +101,13 @@ const Mockups = ({ p }) => {
             </Reveal>
           ))}
         </div>
+        {(p.videos ?? []).length > 0 && (
+          <div className="mt-16 grid gap-8 sm:grid-cols-2" data-testid="project-videos">
+            {p.videos.map((v, i) => (
+              <video key={v} controls playsInline preload="metadata" className="aspect-video w-full border border-line bg-ink-950 object-cover" aria-label={`${p.title} video ${i + 1}`} src={mediaUrl(v)} data-testid={`project-video-${i}`} />
+            ))}
+          </div>
+        )}
         {captions.length > 0 && (
           <div className="mt-20">
             <h3 className="t-h3">Sample captions</h3>

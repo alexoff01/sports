@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://59aedb14-aef3-4bbb-a3cd-d1979a1041d5.preview.emergentagent.com/sitemap.xml
+Sitemap: https://studio-console-1--2pxbyqz1.preview.emergentagent.com/sitemap.xml

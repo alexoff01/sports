@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import "@/App.css";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
@@ -22,8 +22,15 @@ import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import CookiePolicy from "@/pages/CookiePolicy";
 import NotFound from "@/pages/NotFound";
 
-const AdminApp = lazy(() => import("@/admin/AdminApp"));
-const ADMIN_PATH = process.env.REACT_APP_ADMIN_PATH;
+const Studio = lazy(() => import("@/admin/AdminApp"));
+// Only a SHA-256 digest of the private route ships in the public bundle; the route itself never does.
+const PRIVATE_DIGEST = process.env.REACT_APP_ADMIN_PATH_HASH;
+const PUBLIC_SEGMENTS = new Set(["", "projects", "about", "contact", "privacy-policy", "cookie-policy"]);
+
+const sha256Hex = async (text) => {
+  const buf = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
+};
 
 const page = (Component) => (
   <PageTransition>
@@ -61,6 +68,33 @@ const PublicSite = () => {
   );
 };
 
+const RouteGate = () => {
+  const { pathname } = useLocation();
+  const segment = pathname.split("/")[1] ?? "";
+  const known = PUBLIC_SEGMENTS.has(segment) || !PRIVATE_DIGEST || !window.crypto?.subtle;
+  const [match, setMatch] = useState(null);
+
+  useEffect(() => {
+    if (known) return undefined;
+    let live = true;
+    sha256Hex(segment)
+      .then((digest) => live && setMatch({ segment, ok: digest === PRIVATE_DIGEST }))
+      .catch(() => live && setMatch({ segment, ok: false }));
+    return () => {
+      live = false;
+    };
+  }, [segment, known]);
+
+  if (known) return <PublicSite />;
+  if (!match || match.segment !== segment) return <div className="min-h-screen bg-ink-950" />;
+  if (!match.ok) return <PublicSite />;
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-ink-950" />}>
+      <Studio />
+    </Suspense>
+  );
+};
+
 function App() {
   return (
     <ErrorBoundary>
@@ -68,19 +102,7 @@ function App() {
         <ConsentProvider>
           <BrowserRouter>
             <SmoothScroll />
-            <Routes>
-              {ADMIN_PATH && (
-                <Route
-                  path={`/${ADMIN_PATH}/*`}
-                  element={
-                    <Suspense fallback={<div className="min-h-screen bg-ink-950" />}>
-                      <AdminApp />
-                    </Suspense>
-                  }
-                />
-              )}
-              <Route path="*" element={<PublicSite />} />
-            </Routes>
+            <RouteGate />
           </BrowserRouter>
         </ConsentProvider>
       </MotionConfig>

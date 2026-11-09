@@ -6,18 +6,18 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 
-from core import ALLOWED_ORIGINS, client, db
+from config import ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, ALLOWED_ORIGINS
+from core import client, db, now
 import auth
 import contact
 import projects
+from seed import ensure_user_indexes, seed_admin
 from seed_data import SEED_PROJECTS
-from core import now
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("portfolio")
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-auth.check_config()
 
 SECURITY_HEADERS = {
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
@@ -26,7 +26,7 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()",
     "Cross-Origin-Opener-Policy": "same-origin",
-    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
 }
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -59,7 +59,7 @@ async def validation_handler(_: Request, exc: RequestValidationError):
 
 @app.exception_handler(StarletteHTTPException)
 async def http_handler(_: Request, exc: StarletteHTTPException):
-    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
 
 @app.exception_handler(Exception)
@@ -77,6 +77,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
+    max_age=600,
     allow_headers=["Content-Type", "X-CSRF-Token"],
 )
 
@@ -85,16 +86,24 @@ app.add_middleware(
 async def startup():
     await db.rate_limits.create_index("at", expireAfterSeconds=7200)
     await db.rate_limits.create_index("k")
-    await db.admin_login_tokens.create_index("token_hash", unique=True)
-    await db.admin_login_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await ensure_user_indexes(db)
     await db.admin_sessions.create_index("expires_at", expireAfterSeconds=0)
     await db.admin_sessions.create_index("session_id", unique=True)
+    await db.admin_sessions.create_index("user")
+    await db.auth_lockouts.create_index("key", unique=True)
+    await db.auth_lockouts.create_index("updated_at", expireAfterSeconds=24 * 3600)
+    await db.totp_pending.create_index("user", unique=True)
+    await db.totp_pending.create_index("created_at", expireAfterSeconds=600)
+    await db.totp_used.create_index("key", unique=True)
+    await db.totp_used.create_index("at", expireAfterSeconds=300)
+    await db.upload_sessions.create_index("id", unique=True)
+    await db.upload_sessions.create_index("created_at", expireAfterSeconds=3600)
     await db.security_events.create_index("timestamp", expireAfterSeconds=90 * 24 * 3600)
     await db.messages.create_index("created_at", expireAfterSeconds=365 * 24 * 3600)
-    for legacy in ("admins", "sessions", "login_attempts"):
-        await db.drop_collection(legacy)
     await db.projects.create_index("slug", unique=True)
     await db.projects.create_index("id", unique=True)
+    await db.media.create_index("id", unique=True)
+    await seed_admin(db, ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD)
     if await db.projects.count_documents({}) == 0:
         for i, p in enumerate(SEED_PROJECTS):
             await db.projects.insert_one({**p, "order": i, "published": True, "created_at": now(), "updated_at": now()})

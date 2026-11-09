@@ -101,3 +101,58 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+user_problem_statement: "Replace admin login with a single pre-seeded admin account (email + password, Argon2id), mandatory TOTP, revocable sessions, lockout, CSRF, rate limits, hidden lazy-loaded studio route, project manager, messages, media (images + chunked video), settings with change password. No public registration."
+
+backend:
+  - task: "Admin auth (seed, login, TOTP setup/confirm/verify, sessions, lockout, CSRF, change-password, settings)"
+    implemented: true
+    working: true
+    file: "backend/auth.py, backend/seed.py, backend/passwords.py, backend/config.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "30 pytest tests pass (backend/tests/test_admin_auth.py, isolated DB). Live E2E via /tmp/e2e_check.py passes."
+  - task: "Admin projects/media/uploads (publish endpoint, videos field, chunked video upload, AVIF/WebP variants, media library)"
+    implemented: true
+    working: true
+    file: "backend/projects.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Covered by pytest + live E2E (image upload, publish, public visibility)."
+
+frontend:
+  - task: "Hidden studio route + login/TOTP/dashboard/settings/media/editor"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/App.js, frontend/src/admin/*"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Login screen verified by screenshot; full UI flow needs testing."
+
+metadata:
+  created_by: "main_agent"
+  version: "2.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Hidden studio route + login/TOTP/dashboard/settings/media/editor"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "See memory/test_credentials.md. Admin path is ADMIN_PATH in backend/.env. TOTP secret for testing in /tmp/e2e_totp_secret."

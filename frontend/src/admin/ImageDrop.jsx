@@ -53,7 +53,7 @@ export const ImageDrop = ({ onUploaded, multiple = false, testId }) => {
         <span>Drop {multiple ? "images" : "an image"} here or click to choose</span>
         <span className="text-xs text-slate-400">JPG, PNG, WebP, AVIF · max 10 MB · EXIF removed automatically</span>
       </button>
-      <input ref={input} type="file" accept={ALLOWED.join(",")} multiple={multiple} className="sr-only" onChange={(e) => { upload(e.target.files); e.target.value = ""; }} tabIndex={-1} aria-hidden="true" />
+      <input ref={input} type="file" accept={ALLOWED.join(",")} multiple={multiple} className="sr-only" onChange={(e) => { upload(e.target.files); e.target.value = ""; }} tabIndex={-1} aria-hidden="true" data-testid={`${testId}-input`} />
       {progress !== null && (
         <div className="mt-2 h-1.5 w-full bg-ink-800" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
           <div className="h-full bg-volt transition-[width]" style={{ width: `${progress}%` }} />
