@@ -173,6 +173,10 @@ async def clear_failures(email: str, ip: str) -> None:
     await db.auth_lockouts.delete_many({"key": {"$in": _lock_keys(email, ip)}})
 
 
+def _host(request: Request) -> str:
+    return (request.headers.get("host") or "").strip().lower()
+
+
 # ---------------------------------------------------------------- sessions
 async def create_session(request: Request, response: Response, email: str) -> None:
     """Issues a brand-new session id (rotation) and revokes the one presented by the browser, if any."""
@@ -184,6 +188,7 @@ async def create_session(request: Request, response: Response, email: str) -> No
     await db.admin_sessions.insert_one({
         "session_id": sid_hash(sid), "user": email, "csrf_hash": sid_hash(csrf), "created_at": t, "last_seen_at": t,
         "expires_at": t + ABSOLUTE, "ip_hash": hash_key(client_ip(request)), "revoked": False,
+        "host": _host(request),
     })
     max_age = int(ABSOLUTE.total_seconds())
     _cookie(response, SESSION_COOKIE, _jwt({"type": "session", "sid": sid}, ABSOLUTE), max_age)
@@ -203,7 +208,8 @@ async def active_session(request: Request) -> dict | None:
         {"$set": {"last_seen_at": t}},
         projection={"_id": 0},
     )
-    if not doc:
+    if not doc or doc.get("host", _host(request)) != _host(request):
+        # A session belongs to the address it was created on (primary vs staging are separate).
         return None
     user = await db.users.find_one({"email": doc.get("user")}, {"role": 1})
     if not user or user.get("role") != "admin":
@@ -226,7 +232,7 @@ async def require_admin(request: Request) -> AdminContext:
         cookie, header = request.cookies.get(CSRF_COOKIE, ""), request.headers.get("x-csrf-token", "")
         if not cookie or not header or not hmac.compare_digest(cookie, header) \
                 or not hmac.compare_digest(sid_hash(header), session.get("csrf_hash", "")):
-            raise HTTPException(status_code=403, detail="Forbidden.")
+            raise HTTPException(status_code=403, detail="Security token missing or invalid. Please reload the page.")
         await rate_limit("admin-mutation", client_ip(request), 60, 60)
     return AdminContext(email=session["user"], session_id=session["session_id"])
 

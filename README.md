@@ -65,7 +65,7 @@ Row Level Security does not exist in MongoDB; the equivalent is enforced in the 
 
 ## Admin
 1. The account is created automatically at backend startup from `ADMIN_EMAIL` / `ADMIN_INITIAL_PASSWORD` in `backend/.env`. Changing these values later does not change an existing account.
-2. Open `/<ADMIN_PATH>` (see `backend/.env`; it is never linked), sign in, scan the QR with an authenticator app, save the recovery codes and enter the code. Two-factor is then required on every sign-in.
+2. Open `/<ADMIN_PATH>` (see `backend/.env`; never linked), sign in, scan the QR with an authenticator app, save the recovery codes and enter the code. Two-factor is then required on every sign-in.
 3. Change the password in Studio > Settings (at least 12 characters).
 4. Lost password or authenticator: on the server run `python scripts/reset_admin_password.py` (add `--reset-totp` to clear two-factor). This revokes all sessions.
 5. Tests: `cd backend && python -m pytest tests -q` (uses an isolated database and a generated password).
@@ -83,3 +83,23 @@ Deploy with Emergent (frontend + backend + MongoDB). Before launch follow the ch
 - Legal details in the Privacy/Cookie policies (postal address, processors, transfers, retention for hiring processes, hosting cookies)
 - Production domain in `sitemap.xml`, `robots.txt` and env files
 - Final images (a real portrait of Alex for About)
+
+## Domains: primary + staging
+- **Primary (canonical, indexed):** `PUBLIC_BASE_URL` / `REACT_APP_SITE_URL` (https://alexcearnau.com).
+- **Staging (never indexed):** the Emergent preview address, listed in `STAGING_HOSTS` / `REACT_APP_STAGING_HOSTS`. It shows a small "Staging preview" label, serves `robots.txt` with `Disallow: /`, `noindex` meta and `X-Robots-Tag: noindex, nofollow`.
+- `ALLOWED_ORIGINS` (backend) and `REACT_APP_ALLOWED_ORIGINS` (frontend) hold the exact https origins. CORS, the Origin check and CSRF compare against that list only. The frontend calls the API on its own origin, so each address has its own host-only `__Host-` cookies and admin sessions are additionally bound to the host they were created on: a session on one address is never valid on the other.
+- Admin link: `<address><ADMIN_PATH>` on both addresses (value in `backend/.env`). Security never relies on the path: Argon2id, mandatory TOTP, lockout, rate limits, CSRF, Origin checks and server-side authorization protect it. Every unknown path, the admin path and retired paths return the same 404 response; repeated 404s per IP are rate-limited.
+
+### How pages are served
+- **Staging (dev server):** `frontend/src/setupProxy.js` adds per-route `<head>`, JSON-LD, the real HTTP status (404 for unknown paths and drafts), host-aware `robots.txt`/`sitemap.xml`, www→apex 301 and staging `X-Robots-Tag`.
+- **Production (static build on the platform CDN):** `yarn build` runs `scripts/prerender.js`, which writes one HTML file per public route and published project (title, description, canonical, Open Graph, JSON-LD, h1 and intro already in the source) plus `robots.txt` and `sitemap.xml` for the primary domain. **Redeploy after publishing a new project** so it is prerendered and listed in the static sitemap. The always-current sitemap is also at `/api/seo/sitemap.xml`. A static host cannot return real 404 status codes or custom headers for HTML pages; unknown routes fall back to the SPA (client-side `noindex`).
+
+### Manual steps (you)
+1. **Hosting panel (Emergent → Deployments → Manage → Domain):** add `alexcearnau.com` and `www.alexcearnau.com`, enable the **www → root redirect (301)**. SSL is provisioned automatically once DNS is correct.
+2. **Registrar DNS:** create the records the hosting panel shows for the apex (A/ALIAS/CNAME-flattening as instructed) and for `www` (CNAME). Remove old conflicting A/AAAA records. Wait for propagation and the certificate.
+3. **Environment for production:** `PUBLIC_BASE_URL=https://alexcearnau.com`, `ALLOWED_ORIGINS=https://alexcearnau.com,<staging origin>`, `STAGING_HOSTS=<staging host>`, `APP_ENV=production`, `COOKIE_SECURE=true`; frontend `REACT_APP_SITE_URL`, `REACT_APP_ALLOWED_ORIGINS`, `REACT_APP_STAGING_HOSTS`, optional `GOOGLE_SITE_VERIFICATION` / `BING_SITE_VERIFICATION`. Note: the platform may rewrite `REACT_APP_BACKEND_URL`/`CORS_ORIGINS` when a domain is verified; the app uses `ALLOWED_ORIGINS`.
+4. **Headers the platform cannot set from the app for static HTML** (ask Emergent support or set at the CDN if possible): `Strict-Transport-Security: max-age=31536000` (no includeSubDomains/preload yet), CSP (see `SECURITY.md`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Robots-Tag: noindex` on staging hosts, Brotli/gzip and long caching for `/static/*` (already provided by the CDN). **Disable Cloudflare Web Analytics / "browser insights" for the domain** (it injects `static.cloudflareinsights.com` without consent).
+5. Follow `docs/SEO-CHECKLIST.md` after launch and `docs/GDPR.md` for privacy operations.
+
+## Legal texts
+The Privacy Policy, Cookie Policy and `docs/GDPR.md` are templates prepared in good faith. They must be reviewed by a legal professional before launch; this project does not claim certified legal compliance. Replace every `TODO_CONFIRM`.

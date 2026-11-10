@@ -11,6 +11,8 @@ Stack: React (CRA) frontend, FastAPI backend, MongoDB, Emergent object storage a
 - **Lockout**: 5 failed password or TOTP attempts lock the account and the IP for 15 minutes with a progressive delay; success resets the counter. Messages stay generic.
 - **Rate limits (per IP)**: login 10/hour, TOTP verify/confirm 5 per 10 minutes, admin mutations and uploads 60/minute, contact form 5/hour.
 - **Authorization**: one dependency, `require_admin`, guards every admin endpoint (projects, publish, reorder, uploads, media, messages, settings, change password). It checks signature, stored session, revocation, absolute and idle expiry, and the admin role. Tests enumerate all admin routes and prove 401 without a valid session and 403 without CSRF.
+- **Domains**: CORS, the Origin check and CSRF use the exact `ALLOWED_ORIGINS` list (primary + staging, https only). Cookies are host-only `__Host-` cookies and each admin session is bound server-side to the host it was created on, so a session on one address is never valid on the other.
+- **Admin path**: short `ADMIN_PATH` (3-20 chars; common names like /admin, /login, /wp-admin are refused in production). The admin path, retired paths and unknown paths return the same 404 response; 404s are rate-limited per IP (API: 60 per 10 min; staging HTML: 30 per 10 min). Note: the public bundle contains only a SHA-256 digest of the path, which does not stop a dictionary guess of a short path; protection comes from authentication, not secrecy.
 - **CSRF**: double-submit token (`__Host-admin_csrf` cookie + `X-CSRF-Token` header, also bound to the session server-side) on every state-changing admin request, plus SameSite=Strict and a strict `Origin` check. CORS allows only `PUBLIC_BASE_URL` (plus `http://localhost:3000` when `APP_ENV=development`).
 - **Audit trail**: security events (login failed/succeeded, TOTP, lockout, password changed, logout) with a hashed IP only, TTL 90 days. Passwords, hashes, tokens and full IPs are never stored in events or logs.
 - **Production start-up guard**: with `APP_ENV=production` the backend refuses to start if `ADMIN_EMAIL`, `JWT_SECRET` (min 32 bytes), `ADMIN_PATH`, `TOTP_ENCRYPTION_KEY` or an https `PUBLIC_BASE_URL` is missing or weak.
@@ -21,14 +23,14 @@ Stack: React (CRA) frontend, FastAPI backend, MongoDB, Emergent object storage a
 - **Contact form**: server-side schema validation, control-character stripping, honeypot, rate limit, HTML-escaped email template.
 
 ## Headers
-API responses: HSTS, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, CSP `default-src 'none'; frame-ancestors 'none'` (no inline scripts), `Permissions-Policy`, COOP. Admin and auth responses add `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow`.
+API responses: HSTS `max-age=31536000` on the primary host only (no includeSubDomains/preload until all subdomains use https), `X-Robots-Tag: noindex, nofollow` on all `/api`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, CSP `default-src 'none'; frame-ancestors 'none'` (no inline scripts), `Permissions-Policy`, COOP. Admin and auth responses add `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow`.
 
 ## Admin discoverability
 The studio route is `ADMIN_PATH` (backend `.env`). Only its SHA-256 digest (`REACT_APP_ADMIN_PATH_HASH`) is in the frontend environment; the path itself never appears in HTML, sitemap, robots.txt, source maps (disabled) or the public bundle. Studio code is a separate lazy-loaded chunk and sets `noindex, nofollow`. Security never relies on hiding the path.
 
 ## Not covered by the app (hosting layer)
 - CSP/HSTS and `X-Robots-Tag` for the static HTML pages (including the studio route) must be set by the host. Suggested CSP: `default-src 'self'; script-src 'self' 'sha256-<inline-script-hashes>'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'`.
-- The Emergent preview injects `emergent-main.js` and its edge adds its own CORS headers; review both before hosting elsewhere.
+- The platform script `emergent-main.js` is loaded only on non-primary hosts (staging). The CDN edge injects Cloudflare Web Analytics (`static.cloudflareinsights.com`) and sets `__cf_bm`/`cf_clearance`; disable Web Analytics for the domain in the hosting/CDN settings, since it loads before consent.
 - The client IP for per-IP limits is taken from the first `X-Forwarded-For` entry; account-level lockout still applies if that header is spoofed.
 
 ## Pre-launch checklist

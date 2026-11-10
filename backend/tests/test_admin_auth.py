@@ -35,6 +35,7 @@ from pymongo.errors import DuplicateKeyError  # noqa: E402
 import auth  # noqa: E402
 import projects  # noqa: E402
 from config import ADMIN_EMAIL, ALLOWED_ORIGINS  # noqa: E402
+from config import PRIMARY_HOST as PRIMARY_HOST_FOR_HSTS  # noqa: E402
 from passwords import verify_password  # noqa: E402
 from seed import ensure_user_indexes, seed_admin  # noqa: E402
 from server import app  # noqa: E402
@@ -508,7 +509,10 @@ def test_security_headers():
     assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
     assert "unsafe-inline" not in r.headers["content-security-policy"]
     assert r.headers["x-content-type-options"] == "nosniff"
-    assert "max-age=" in r.headers["strict-transport-security"]
+    assert "strict-transport-security" not in r.headers  # only on the primary host
+    p = new_client().get("/api/projects", headers={"Host": PRIMARY_HOST_FOR_HSTS})
+    assert p.headers["strict-transport-security"] == "max-age=31536000"
+    assert p.headers["x-robots-tag"] == "noindex, nofollow"
 
 
 # ------------------------------------------------------------------ production config
@@ -528,3 +532,126 @@ def test_production_refuses_missing_or_weak_secrets(name, value):
 
 def test_weak_initial_password_never_blocks_startup():
     assert _import_config(ADMIN_INITIAL_PASSWORD="short").returncode == 0
+
+
+# ================================================================== domains, admin path, SEO, GDPR
+from config import ADMIN_PATH as ADMIN_PATH_CFG, PRIMARY_HOST, STAGING_HOSTS  # noqa: E402
+
+PRIMARY_ORIGIN = f"https://{PRIMARY_HOST}"
+STAGING_ORIGIN = f"https://{STAGING_HOSTS[0]}" if STAGING_HOSTS else None
+
+
+def test_every_allowed_origin_works_and_others_are_rejected():
+    assert PRIMARY_ORIGIN in ALLOWED_ORIGINS and all(o.startswith("https://") and not o.endswith("/") for o in ALLOWED_ORIGINS)
+    for origin in ALLOWED_ORIGINS:
+        r = new_client().post("/api/admin-auth/login", json={"email": "x@example.com", "password": "nope-nope"}, headers={"Origin": origin})
+        assert r.status_code == 401, origin
+        pre = new_client().request("OPTIONS", "/api/admin-auth/login", headers={"Origin": origin, "Access-Control-Request-Method": "POST"})
+        assert pre.headers.get("access-control-allow-origin") == origin
+    for bad in ("https://evil.example", f"http://{PRIMARY_HOST}", f"https://www.{PRIMARY_HOST}", PRIMARY_ORIGIN + ".evil.example", "null"):
+        r = new_client().post("/api/admin-auth/login", json={"email": "x@example.com", "password": "nope-nope"}, headers={"Origin": bad})
+        assert r.status_code == 403 and r.json()["code"] == "origin_rejected", bad
+        pre = new_client().request("OPTIONS", "/api/admin-auth/login", headers={"Origin": bad, "Access-Control-Request-Method": "POST"})
+        assert "access-control-allow-origin" not in pre.headers
+
+
+def test_session_from_one_address_is_rejected_on_the_other():
+    c = signed_in()
+    c.headers["Host"] = PRIMARY_HOST
+    DB.totp_used.delete_many({})
+    c.post("/api/admin-auth/login", json={"email": ADMIN_EMAIL, "password": TEST_PASSWORD})
+    assert c.post("/api/admin-auth/totp/verify", json={"code": pyotp.TOTP(totp_secret()).now()}).status_code == 200
+    assert c.get("/api/admin/projects").status_code == 200
+    c.headers["Host"] = STAGING_HOSTS[0] if STAGING_HOSTS else "staging.example"
+    assert c.get("/api/admin/projects").status_code == 401
+
+
+def test_admin_paths_and_unknown_routes_get_identical_404_metadata():
+    pages = [new_client().get("/api/seo/page", params={"path": p, "host": PRIMARY_HOST}).json()
+             for p in (ADMIN_PATH_CFG, "/studio-" + secrets.token_hex(8), "/definitely-unknown", "/projects/not-a-project", "/admin")]
+    assert all(p["status"] == 404 and p["robots"] == "noindex, nofollow" for p in pages)
+    assert all(p == pages[0] for p in pages)
+
+
+def test_unknown_api_paths_are_rate_limited():
+    c = new_client("192.0.2.200")
+    codes = [c.get(f"/api/nothing-here-{i}").status_code for i in range(61)]
+    assert codes[:60] == [404] * 60 and codes[60] == 429
+    assert c.get("/api/projects").status_code == 429
+    assert new_client("192.0.2.201").get("/api/projects").status_code == 200
+
+
+def test_sitemap_has_primary_domain_and_published_projects_only():
+    c = signed_in()
+    draft = c.post("/api/admin/projects", json=project_body("test-sitemap-draft"), headers=csrf(c)).json()
+    xml = new_client().get("/api/seo/sitemap.xml").text
+    assert "test-sitemap-draft" not in xml and ADMIN_PATH_CFG not in xml and "/api/" not in xml
+    locs = __import__("re").findall(r"<loc>([^<]+)</loc>", xml)
+    assert locs and all(loc.startswith(PRIMARY_ORIGIN + "/") for loc in locs)
+    published = [p["slug"] for p in DB.projects.find({"published": True})]
+    assert {f"{PRIMARY_ORIGIN}/projects/{s}" for s in published} <= set(locs)
+    routes = new_client().get("/api/seo/routes").json()
+    assert "/projects/test-sitemap-draft" not in routes and ADMIN_PATH_CFG not in routes
+    c.delete(f"/api/admin/projects/{draft['id']}", headers=csrf(c))
+
+
+def test_robots_is_host_aware():
+    staging = new_client().get("/api/seo/robots.txt", params={"host": STAGING_HOSTS[0] if STAGING_HOSTS else "x.example"}).text
+    unknown = new_client().get("/api/seo/robots.txt", params={"host": "attacker.example"}).text
+    primary = new_client().get("/api/seo/robots.txt", params={"host": PRIMARY_HOST}).text
+    assert "Disallow: /\n" in staging and "Disallow: /\n" in unknown
+    assert "Disallow: /\n" not in primary and f"Sitemap: {PRIMARY_ORIGIN}/sitemap.xml" in primary
+    assert new_client().get("/api/seo/page", params={"path": "/", "host": f"www.{PRIMARY_HOST}"}).json() == {
+        "status": 301, "redirect": f"{PRIMARY_ORIGIN}/"}
+    page = new_client().get("/api/seo/page", params={"path": "/about", "host": STAGING_HOSTS[0] if STAGING_HOSTS else "x"}).json()
+    assert page["robots"] == "noindex, nofollow" and page["canonical"] == f"{PRIMARY_ORIGIN}/about"
+
+
+def test_structured_data_is_honest():
+    page = new_client().get("/api/seo/page", params={"path": "/projects/final-whistle-live", "host": PRIMARY_HOST}).json()
+    types = [g["@type"] for g in page["jsonld"]["@graph"]]
+    assert {"WebSite", "Person", "CreativeWork", "BreadcrumbList"} <= set(types)
+    text = str(page["jsonld"])
+    for banned in ("Product", "Offer", "Review", "AggregateRating", "LocalBusiness", "telephone", "streetAddress"):
+        assert banned not in text
+    person = next(g for g in page["jsonld"]["@graph"] if g["@type"] == "Person")
+    assert person["address"] == {"@type": "PostalAddress", "addressLocality": "Oradea", "addressRegion": "Bihor", "addressCountry": "RO"}
+    assert "email" not in person
+
+
+def test_message_retention_ttl_index():
+    from config import MESSAGE_RETENTION_DAYS
+    info = DB.messages.index_information()["created_at_1"]
+    assert info["expireAfterSeconds"] == MESSAGE_RETENTION_DAYS * 24 * 3600
+
+
+def test_contact_consent_record_and_privacy_export_erase():
+    sender = f"subject-{secrets.token_hex(3)}@example.com"
+    body = {"name": "Test Person", "email": sender, "inquiry_type": "Collaboration", "message": "Hello, this is a test inquiry message.",
+            "consent": True, "website": ""}
+    r = new_client("192.0.2.210").post("/api/contact", json=body)
+    assert r.status_code == 200, r.text
+    assert new_client("192.0.2.211").post("/api/contact", json={**body, "consent": False}).status_code == 422
+    doc = DB.messages.find_one({"email": sender})
+    assert doc["consent"] is True and doc["consent_at"] and doc["privacy_policy_version"]
+    for path in ("/api/admin/messages/export", "/api/admin/messages/erase"):
+        assert new_client().post(path, json={"email": sender}).status_code == 401
+    c = signed_in()
+    assert c.post("/api/admin/messages/export", json={"email": sender}).status_code == 403  # CSRF required
+    exp = c.post("/api/admin/messages/export", json={"email": sender.upper()}, headers=csrf(c)).json()
+    assert exp["count"] == 1 and exp["messages"][0]["message"].startswith("Hello")
+    assert c.post("/api/admin/messages/erase", json={"email": sender}, headers=csrf(c)).json()["deleted"] == 1
+    assert DB.messages.count_documents({"email": sender}) == 0
+
+
+@pytest.mark.parametrize("name,value", [("ADMIN_PATH", "/admin"), ("ADMIN_PATH", "/wp-admin"), ("ADMIN_PATH", "/Has-Upper"),
+                                        ("ADMIN_PATH", "/" + "a" * 21), ("ALLOWED_ORIGINS", "*"),
+                                        ("ALLOWED_ORIGINS", "https://alexcearnau.com/"), ("ALLOWED_ORIGINS", "http://alexcearnau.com"),
+                                        ("PUBLIC_BASE_URL", "https://alexcearnau.com/path")])
+def test_production_refuses_bad_paths_and_origins(name, value):
+    r = _import_config(**{name: value})
+    assert r.returncode != 0 and name in r.stderr
+
+
+def test_short_admin_path_is_accepted_in_production():
+    assert _import_config(ADMIN_PATH=ADMIN_PATH_CFG).returncode == 0

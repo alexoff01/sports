@@ -10,6 +10,7 @@ from auth import require_admin
 from core import clean_text, client_ip, db, now, rate_limit
 from emailer import EMAIL_FROM_NAME, send_email
 
+PRIVACY_POLICY_VERSION = "2.0"
 RECIPIENT = os.environ["CONTACT_RECIPIENT"]
 router = APIRouter(prefix="/api")
 
@@ -64,6 +65,9 @@ async def contact(body: ContactIn, request: Request):
         "email": body.email.lower(),
         "inquiry_type": body.inquiry_type,
         "message": body.message,
+        "consent": True,
+        "consent_at": now(),
+        "privacy_policy_version": PRIVACY_POLICY_VERSION,
         "created_at": now(),
     }
     doc["delivered"] = await send_email(
@@ -77,8 +81,35 @@ async def contact(body: ContactIn, request: Request):
 async def list_messages(_: str = Depends(require_admin)):
     items = await db.messages.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     for m in items:
-        m["created_at"] = m["created_at"].isoformat()
+        _iso(m)
     return items
+
+
+def _iso(m: dict) -> dict:
+    for k in ("created_at", "consent_at"):
+        if hasattr(m.get(k), "isoformat"):
+            m[k] = m[k].isoformat()
+    return m
+
+
+class SenderIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: str = Field(min_length=3, max_length=254)
+
+
+@router.post("/admin/messages/export")
+async def export_sender(body: SenderIn, _: str = Depends(require_admin)):
+    """Data subject access request: every stored message from one sender, as JSON."""
+    email = body.email.strip().lower()
+    items = await db.messages.find({"email": email}, {"_id": 0, "delivered": 0}).sort("created_at", 1).to_list(1000)
+    return {"email": email, "exported_at": now().isoformat(), "count": len(items), "messages": [_iso(m) for m in items]}
+
+
+@router.post("/admin/messages/erase")
+async def erase_sender(body: SenderIn, _: str = Depends(require_admin)):
+    """Erasure request: permanently deletes every message from one sender (confirmed in the UI)."""
+    res = await db.messages.delete_many({"email": body.email.strip().lower()})
+    return {"ok": True, "deleted": res.deleted_count}
 
 
 @router.delete("/admin/messages/{message_id}")

@@ -23,8 +23,9 @@ export const SITE = {
   ],
   // TODO_CONFIRM: neutral placeholder until Alex approves a statement.
   quote: "Every match carries a story. The work is finding it and telling it well.",
-  cookiePolicyVersion: "1.0",
-  legalUpdated: "22 October 2026",
+  cookiePolicyVersion: "1.1",
+  privacyPolicyVersion: "2.0",
+  legalUpdated: "10 November 2026",
 };
 
 export const confirmedSocials = SITE.socials.filter((s) => /^https:\/\/\S+$/.test(s.url));

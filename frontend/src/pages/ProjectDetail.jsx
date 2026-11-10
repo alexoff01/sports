@@ -2,7 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Info } from "lucide-react";
 import { useSeo } from "@/lib/seo";
 import { Picture } from "@/components/site/Picture";
-import { useProject } from "@/hooks/useProjects";
+import { useProject, useProjects } from "@/hooks/useProjects";
 import { MaskedHeadline } from "@/components/site/MaskedHeadline";
 import { Reveal } from "@/components/site/Reveal";
 import { TypeBadge } from "@/components/site/ProjectCard";
@@ -25,9 +25,19 @@ const STEPS = [
 const DetailHero = ({ p }) => (
   <section className="relative overflow-hidden pt-36 md:pt-44" aria-labelledby="project-title">
     <div className="container-x">
-      <Link to="/projects" data-testid="back-to-projects-link" className="group inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-300 hover:text-white">
-        <ArrowLeft aria-hidden="true" className="h-4 w-4 transition-transform group-hover:-translate-x-1" /> All projects
-      </Link>
+      <nav aria-label="Breadcrumb" data-testid="project-breadcrumbs">
+        <ol className="flex flex-wrap items-center gap-x-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-300">
+          <li><Link to="/" className="inline-flex min-h-[44px] items-center hover:text-white" data-testid="breadcrumb-home">Home</Link></li>
+          <li aria-hidden="true" className="text-slate-500">/</li>
+          <li>
+            <Link to="/projects" data-testid="back-to-projects-link" className="group inline-flex min-h-[44px] items-center gap-2 hover:text-white">
+              <ArrowLeft aria-hidden="true" className="h-4 w-4 transition-transform group-hover:-translate-x-1" /> All projects
+            </Link>
+          </li>
+          <li aria-hidden="true" className="hidden text-slate-500 sm:block">/</li>
+          <li aria-current="page" className="hidden max-w-[16rem] truncate text-slate-500 sm:block">{p.title}</li>
+        </ol>
+      </nav>
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <TypeBadge type={p.project_type} label={`${p.project_type} project`} />
         <span className="tag">{p.label}</span>
@@ -126,6 +136,32 @@ const Mockups = ({ p }) => {
   );
 };
 
+const Related = ({ current }) => {
+  const { projects } = useProjects();
+  const others = (projects ?? []).filter((x) => x.slug !== current.slug).slice(0, 3);
+  return (
+    <section className="container-x pb-20" aria-labelledby="related-title" data-testid="related-projects">
+      <h2 id="related-title" className="eyebrow">More projects</h2>
+      {others.length > 0 && (
+        <ul className="mt-6 grid gap-px border border-line bg-line sm:grid-cols-3">
+          {others.map((o) => (
+            <li key={o.slug} className="bg-ink-950">
+              <Link to={`/projects/${o.slug}`} className="block min-h-[44px] p-5 transition-colors hover:bg-ink-900" data-testid={`related-${o.slug}`}>
+                <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">{o.project_type} project</span>
+                <span className="mt-2 block font-display text-xl font-bold uppercase text-paper">{o.title}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-6 flex flex-wrap gap-x-8 gap-y-2 text-sm font-semibold">
+        <Link to="/projects" className="inline-flex min-h-[44px] items-center text-volt-bright underline-offset-4 hover:underline" data-testid="related-all-link">View all sports social media projects</Link>
+        <Link to="/contact" className="inline-flex min-h-[44px] items-center text-volt-bright underline-offset-4 hover:underline" data-testid="related-contact-link">Get in touch about a collaboration</Link>
+      </div>
+    </section>
+  );
+};
+
 export default function ProjectDetail() {
   const { slug } = useParams();
   const { project, loading, error } = useProject(slug);
@@ -133,6 +169,7 @@ export default function ProjectDetail() {
     title: project?.title ?? "Project",
     description: project?.summary ?? "Sports social media concept project by Alex Cearnau.",
     path: `/projects/${slug}`,
+    image: project?.cover_image,
   });
   if (loading) return <div className="min-h-screen" aria-busy="true" />;
   if (error || !project) return <NotFound />;
@@ -142,6 +179,7 @@ export default function ProjectDetail() {
       <CaseStudy p={project} />
       <PitchDivider />
       <Mockups p={project} />
+      <Related current={project} />
       <CtaBand />
     </>
   );

@@ -6,11 +6,14 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 
-from config import ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, ALLOWED_ORIGINS
-from core import client, db, now
+from config import ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, ALLOWED_ORIGINS, MESSAGE_RETENTION_DAYS, PRIMARY_HOST
+from datetime import timedelta
+
+from core import client, client_ip, db, hash_key, now
 import auth
 import contact
 import projects
+import seo
 from seed import ensure_user_indexes, seed_admin
 from seed_data import SEED_PROJECTS
 
@@ -20,7 +23,6 @@ logger = logging.getLogger("portfolio")
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
 SECURITY_HEADERS = {
-    "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -28,6 +30,7 @@ SECURITY_HEADERS = {
     "Cross-Origin-Opener-Policy": "same-origin",
     "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
 }
+NOT_FOUND_LIMIT = 60  # 404s per IP per 10 minutes before every /api request is refused
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 
 
@@ -37,10 +40,21 @@ async def security(request: Request, call_next):
     if request.method in MUTATING and path.startswith("/api"):
         origin = (request.headers.get("origin") or "").rstrip("/")
         if origin not in ALLOWED_ORIGINS:
-            return JSONResponse({"detail": "Forbidden."}, status_code=403)
+            return JSONResponse({"detail": "Request origin not allowed.", "code": "origin_rejected"}, status_code=403)
+    ip_key = f"notfound:{hash_key(client_ip(request))}"
+    if path.startswith("/api") and await db.rate_limits.count_documents(
+            {"k": ip_key, "at": {"$gte": now() - timedelta(minutes=10)}}) >= NOT_FOUND_LIMIT:
+        return JSONResponse({"detail": "Too many requests. Please try again later."}, status_code=429, headers={"Retry-After": "600"})
     response = await call_next(request)
+    if response.status_code == 404 and path.startswith("/api"):
+        await db.rate_limits.insert_one({"k": ip_key, "at": now()})
     for k, v in SECURITY_HEADERS.items():
         response.headers.setdefault(k, v)
+    if (request.headers.get("host") or "").lower() == PRIMARY_HOST:
+        # No includeSubDomains/preload until every subdomain is confirmed to use https.
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    if path.startswith("/api"):
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
     if path.startswith("/api/admin"):
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
         response.headers["Cache-Control"] = "no-store"
@@ -71,6 +85,7 @@ async def error_handler(_: Request, exc: Exception):
 app.include_router(auth.router)
 app.include_router(contact.router)
 app.include_router(projects.router)
+app.include_router(seo.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -80,6 +95,16 @@ app.add_middleware(
     max_age=600,
     allow_headers=["Content-Type", "X-CSRF-Token"],
 )
+
+
+async def ensure_ttl(collection, field: str, seconds: int) -> None:
+    """Create the TTL index, or update its expiry in place when MESSAGE_RETENTION_DAYS changes."""
+    name = f"{field}_1"
+    info = await collection.index_information()
+    if name in info and info[name].get("expireAfterSeconds") != seconds:
+        await collection.database.command({"collMod": collection.name, "index": {"name": name, "expireAfterSeconds": seconds}})
+    elif name not in info:
+        await collection.create_index(field, expireAfterSeconds=seconds)
 
 
 @app.on_event("startup")
@@ -99,7 +124,8 @@ async def startup():
     await db.upload_sessions.create_index("id", unique=True)
     await db.upload_sessions.create_index("created_at", expireAfterSeconds=3600)
     await db.security_events.create_index("timestamp", expireAfterSeconds=90 * 24 * 3600)
-    await db.messages.create_index("created_at", expireAfterSeconds=365 * 24 * 3600)
+    await ensure_ttl(db.messages, "created_at", MESSAGE_RETENTION_DAYS * 24 * 3600)
+    await db.messages.create_index("email")
     await db.projects.create_index("slug", unique=True)
     await db.projects.create_index("id", unique=True)
     await db.media.create_index("id", unique=True)

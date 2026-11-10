@@ -27,11 +27,14 @@
                 "@graph": [
                     {
                         "@type": "Person",
+                        "@id": "%REACT_APP_SITE_URL%/#person",
                         "name": "Alex Cearnau",
-                        "jobTitle": "Sports Social Media & Digital Content Creator",
+                        "jobTitle": "Sports Social Media & Content Creator",
                         "url": "%REACT_APP_SITE_URL%/",
-                        "address": { "@type": "PostalAddress", "addressLocality": "Oradea", "addressCountry": "RO" },
-                        "knowsAbout": ["Sports social media", "Football content creation", "Sports digital marketing", "Sports communication"]
+                        "image": "%REACT_APP_SITE_URL%/icon-512.png",
+                        "address": { "@type": "PostalAddress", "addressLocality": "Oradea", "addressRegion": "Bihor", "addressCountry": "RO" },
+                        "knowsAbout": ["Sports social media", "Football content creation", "Social media strategy", "Sports digital marketing", "Content creation"],
+                        "hasCredential": { "@type": "EducationalOccupationalCredential", "name": "Social Media in Sports", "credentialCategory": "Course certificate", "dateCreated": "2025", "recognizedBy": { "@type": "Organization", "name": "FC Barcelona Innovation Hub" } }
                     },
                     {
                         "@type": "WebSite",
@@ -43,7 +46,7 @@
             }
         </script>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
-        <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
+        <script>if(location.origin!=="%REACT_APP_SITE_URL%"){var s=document.createElement("script");s.src="https://assets.emergent.sh/scripts/emergent-main.js";document.head.appendChild(s)}</script>
     </head>
     <body>
         <noscript>This portfolio needs JavaScript enabled. You can reach Alex Cearnau through LinkedIn or by email.</noscript>

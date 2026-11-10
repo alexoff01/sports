@@ -111,6 +111,9 @@ export const ContactForm = () => {
           {status.state !== "idle" ? status.message : ""}
         </p>
       </div>
+      <p className="text-xs leading-relaxed text-slate-400" data-testid="contact-privacy-notice">
+        Your details are used only to answer your message and are deleted automatically after 12 months, or sooner on request. See the <Link to="/privacy-policy" className="underline underline-offset-4 hover:text-white">Privacy Policy</Link>.
+      </p>
     </form>
   );
 };

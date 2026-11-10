@@ -7,14 +7,23 @@ import { BTN, LABEL } from "@/admin/ui";
 const fmtWait = (s) => (s >= 60 ? `${Math.ceil(s / 60)} min` : `${s} s`);
 
 const readError = (err, fallback) => {
-  if (!err?.response) return { message: "You seem to be offline or the server is unreachable. Please try again." };
+  if (!err?.response) {
+    return { message: err?.code === "ECONNABORTED" ? "The server took too long to answer. Please try again." : "The server is unreachable. Check your connection and try again." };
+  }
   const { status, data, headers } = err.response;
+  const detail = typeof data?.detail === "string" ? data.detail : "";
   if (status === 429) {
     const wait = Number(headers?.["retry-after"]) || 0;
-    return { message: typeof data?.detail === "string" ? data.detail : "Too many attempts.", lockedFor: wait };
+    if (/too many attempts/i.test(detail)) return { message: detail, lockedFor: wait };
+    return { message: `Too many requests from this network. Please wait ${fmtWait(wait || 60)} and try again.`, lockedFor: wait };
   }
-  if (status === 401 || status === 400) return { message: typeof data?.detail === "string" ? data.detail : fallback, expired: /expired/i.test(data?.detail ?? "") };
-  if (status === 422) return { message: fallback };
+  if (status === 403) {
+    if (data?.code === "origin_rejected") return { message: "Sign-in is not allowed from this web address. Open the site from its official address and try again." };
+    return { message: "Security check failed. Please reload the page and try again." };
+  }
+  if (status === 401 || status === 400) return { message: detail || fallback, expired: /expired/i.test(detail) };
+  if (status === 422) return { message: "Please enter a valid email address and password." };
+  if (status >= 500) return { message: "The server had a problem. Please try again in a moment." };
   return { message: fallback };
 };
 

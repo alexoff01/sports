@@ -56,7 +56,19 @@
 ##   test_all: false
 ##   test_priority: "high_first"  # or "sequential" or "stuck_first"
 ##
-## agent_communication:
+##   - task: "Change request 5: domains (ALLOWED_ORIGINS, staging), /ac-studio admin path, SEO (prerender, setupProxy, /api/seo/*), GDPR (consent record, export/erase, policies)"
+    implemented: true
+    working: "NA"
+    file: "backend/config.py, backend/seo.py, backend/server.py, backend/contact.py, backend/auth.py, frontend/src/setupProxy.js, frontend/seo/inject.js, frontend/scripts/prerender.js, frontend/src/lib/api.js, frontend/src/lib/seo.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "50 pytest pass. Needs browser verification on staging."
+
+agent_communication:
 ##     -agent: "main"  # or "testing" or "user"
 ##     -message: "Communication message between agents"
 

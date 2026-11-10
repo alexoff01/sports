@@ -1,6 +1,7 @@
 import { useSeo } from "@/lib/seo";
 import { LegalLayout } from "@/components/site/LegalLayout";
 import { ObfuscatedEmail } from "@/components/site/ObfuscatedEmail";
+import { SITE } from "@/config/site";
 
 const SECTIONS = [
   {
@@ -21,8 +22,11 @@ const SECTIONS = [
     body: (
       <ul>
         <li><strong>Contact form:</strong> your name, email address, inquiry type, message and the fact that you accepted this policy, plus the date and time of submission.</li>
+        <li><strong>Consent record:</strong> with each message I store the date and time you ticked the consent box and the version of this policy you accepted.</li>
         <li><strong>Abuse prevention:</strong> to limit spam, a one-way hash of your IP address is kept for up to two hours. The IP address itself is not stored.</li>
-        <li><strong>Analytics:</strong> none at the moment. If privacy-friendly, IP-anonymised analytics are added later, they will only run after you allow the Analytics category in Cookie Settings.</li>
+        <li><strong>Security logs:</strong> sign-in events for the private administration area are stored with a one-way hash of the IP address only, for 90 days.</li>
+        <li><strong>Your cookie choice:</strong> stored in your own browser (see the Cookie Policy).</li>
+        <li><strong>Analytics:</strong> none. If privacy-friendly, IP-anonymised analytics are added later, they will only run after you allow the Analytics category in Cookie Settings.</li>
       </ul>
     ),
   },
@@ -40,31 +44,32 @@ const SECTIONS = [
     title: "5. Who receives your data",
     body: (
       <>
-        <p>Messages are delivered to my inbox through a transactional email service and stored in a protected database. Service providers involved: hosting provider (TODO_CONFIRM), email delivery provider (TODO_CONFIRM) and database provider (TODO_CONFIRM). They act as processors under data processing agreements.</p>
-        <p>Your data is never sold or shared for advertising. If any provider processes data outside the European Economic Area, appropriate safeguards such as Standard Contractual Clauses apply (details: TODO_CONFIRM).</p>
+        <p>Messages are delivered to my inbox through a transactional email service and stored in a protected database. Service providers involved: the hosting and application platform Emergent, including its content delivery network Cloudflare (TODO_CONFIRM), the email delivery provider used by the platform (TODO_CONFIRM) and the database provider used by the platform (TODO_CONFIRM). They act as processors under data processing agreements.</p>
+        <p>Some of these providers may process data outside the European Economic Area, for example in the United States. In that case appropriate safeguards apply, such as the EU-U.S. Data Privacy Framework or Standard Contractual Clauses (details: TODO_CONFIRM).</p>
+        <p>Your data is never sold, shared for advertising, used for profiling or used for automated decision-making.</p>
       </>
     ),
   },
   {
     title: "6. How long data is kept",
-    body: <p>Contact messages are deleted automatically after 12 months, or sooner if you ask. Abuse-prevention hashes are deleted after two hours. If a message leads to a collaboration or employment process, relevant information may be kept for as long as that process requires (TODO_CONFIRM).</p>,
+    body: <p>Contact messages are deleted automatically after 12 months, or sooner if you ask. Abuse-prevention hashes are deleted after two hours and security logs after 90 days. If a message leads to a collaboration or employment process, relevant information may be kept for as long as that process requires (TODO_CONFIRM).</p>,
   },
   {
     title: "7. Your rights",
     body: (
       <>
         <p>Under the GDPR you have the right to access your data, to rectification, to erasure, to restriction of processing, to data portability and to object to processing. Where processing is based on consent, you can withdraw it at any time without affecting earlier processing.</p>
-        <p>To exercise any right, write to the email address above. You also have the right to lodge a complaint with the Romanian supervisory authority, ANSPDCP (Autoritatea Națională de Supraveghere a Prelucrării Datelor cu Caracter Personal), <a href="https://www.dataprotection.ro" target="_blank" rel="noopener noreferrer">www.dataprotection.ro</a>, or with the authority in your country of residence.</p>
+        <p>To exercise any right, write to the email address above. I will reply within one month; this can be extended by two further months for complex requests, in which case I will tell you why. You also have the right to lodge a complaint with the Romanian supervisory authority, ANSPDCP (Autoritatea Națională de Supraveghere a Prelucrării Datelor cu Caracter Personal), <a href="https://www.dataprotection.ro" target="_blank" rel="noopener noreferrer">www.dataprotection.ro</a>, or with the authority in your country of residence.</p>
       </>
     ),
   },
   {
     title: "8. Security",
-    body: <p>Data is sent over encrypted connections (HTTPS), validated on the server, and access to stored messages is restricted to the site owner with multi-factor authentication.</p>,
+    body: <p>Data is sent over encrypted connections (HTTPS), validated on the server, and access to stored messages is restricted to the site owner with a strong password and multi-factor authentication. Administrative sign-ins are rate-limited and logged without storing IP addresses in clear.</p>,
   },
   {
     title: "9. Changes to this policy",
-    body: <p>If this policy changes, the new version and date will be published on this page.</p>,
+    body: <p>If this policy changes, the new version and date will be published on this page. Version {SITE.privacyPolicyVersion}, last updated {SITE.legalUpdated}.</p>,
   },
 ];
 

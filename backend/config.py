@@ -37,7 +37,17 @@ _jwt = _env("JWT_SECRET")
 _totp_key = _env("TOTP_ENCRYPTION_KEY")
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-PATH_RE = re.compile(r"^/[A-Za-z0-9_-]{12,64}$")
+PATH_RE = re.compile(r"^/[a-z0-9-]{3,20}$")
+ORIGIN_RE = re.compile(r"^https://[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+(?::\d{2,5})?$")
+FORBIDDEN_PATHS = {"/admin", "/login", "/wp-admin", "/dashboard", "/panel", "/administrator", "/signin", "/cp"}
+
+_origins_raw = [o.strip() for o in _env("ALLOWED_ORIGINS").split(",") if o.strip()]
+STAGING_HOSTS = [h.strip().lower() for h in _env("STAGING_HOSTS").split(",") if h.strip()]
+PRIMARY_HOST = PUBLIC_BASE_URL.split("://", 1)[-1].lower() if PUBLIC_BASE_URL else ""
+try:
+    MESSAGE_RETENTION_DAYS = max(1, int(_env("MESSAGE_RETENTION_DAYS", "365")))
+except ValueError:
+    MESSAGE_RETENTION_DAYS = 365
 
 
 def _valid_fernet(key: str) -> bool:
@@ -54,12 +64,14 @@ def config_problems() -> list[str]:
         problems.append("ADMIN_EMAIL")
     if len(_jwt.encode()) < 32 or len(set(_jwt)) < 10:
         problems.append("JWT_SECRET")
-    if not PATH_RE.match(ADMIN_PATH or ""):
+    if not PATH_RE.match(ADMIN_PATH or "") or ADMIN_PATH in FORBIDDEN_PATHS:
         problems.append("ADMIN_PATH")
     if not _valid_fernet(_totp_key):
         problems.append("TOTP_ENCRYPTION_KEY")
-    if not PUBLIC_BASE_URL.startswith("https://") or "*" in PUBLIC_BASE_URL:
+    if not ORIGIN_RE.match(PUBLIC_BASE_URL):
         problems.append("PUBLIC_BASE_URL")
+    if not _origins_raw or any(not ORIGIN_RE.match(o) for o in _origins_raw) or PUBLIC_BASE_URL not in _origins_raw:
+        problems.append("ALLOWED_ORIGINS")
     return problems
 
 
@@ -78,6 +90,8 @@ check_config()
 JWT_SECRET = _jwt if len(_jwt.encode()) >= 32 else secrets.token_urlsafe(48)
 TOTP_ENCRYPTION_KEY = _totp_key if _valid_fernet(_totp_key) else base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
 
-ALLOWED_ORIGINS = [PUBLIC_BASE_URL] if PUBLIC_BASE_URL and "*" not in PUBLIC_BASE_URL else []
+# Exact https origins only (no wildcard, path or trailing slash); invalid entries are dropped.
+ALLOWED_ORIGINS = [o for o in dict.fromkeys(_origins_raw or [PUBLIC_BASE_URL]) if ORIGIN_RE.match(o)]
 if APP_ENV == "development":
     ALLOWED_ORIGINS.append("http://localhost:3000")
+ALLOWED_HOSTS = [o.split("://", 1)[1] for o in ALLOWED_ORIGINS if o.startswith("https://")]

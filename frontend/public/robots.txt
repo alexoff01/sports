@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /api/
 
-Sitemap: https://studio-console-1--2pxbyqz1.preview.emergentagent.com/sitemap.xml
+Sitemap: https://alexcearnau.com/sitemap.xml

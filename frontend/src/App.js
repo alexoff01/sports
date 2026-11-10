@@ -11,6 +11,7 @@ import { MatchClockProgress } from "@/components/football/MatchClockProgress";
 import { SpotlightCursor } from "@/components/football/SpotlightCursor";
 import { PageTransition } from "@/components/site/PageTransition";
 import { CookieBanner } from "@/components/site/CookieBanner";
+import { StagingBadge } from "@/components/site/StagingBadge";
 import { ConsentProvider } from "@/components/site/ConsentProvider";
 import { ErrorBoundary } from "@/components/site/ErrorBoundary";
 import Home from "@/pages/Home";
@@ -64,6 +65,7 @@ const PublicSite = () => {
       </main>
       <Footer />
       <CookieBanner />
+      <StagingBadge />
     </>
   );
 };
