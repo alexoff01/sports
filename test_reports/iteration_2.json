@@ -1,0 +1,29 @@
+{
+  "summary": "Tested the full change request on the staging host. BUG FIX VERIFIED: admin login at <ADMIN_PATH> works with no offline/unreachable message. Login POST goes to the same origin (staging host)/api/admin-auth/login. Wrong password shows 'Invalid credentials.'. TOTP setup (secret saved to /tmp/e2e_totp_secret) -> dashboard. Sign out, then sign in again with TOTP verify -> dashboard. Projects list loads (6 live). Contact consent: submitting without the checkbox shows consent-error; with it, the form succeeds. GDPR export downloads the JSON and shows the toast 'Exported 1 message(s)'. Erase + confirm shows 'Deleted 1 message(s) permanently' and the message disappears. 404s: <ADMIN_PATH>, the old admin path, unknown paths, /projects/does-not-exist and POST <ADMIN_PATH> all return 404, and the 404 bodies are identical once the CF script is removed. The old path shows 'Offside.' with no redirect. Indexing and SEO: robots Disallow, X-Robots-Tag, title/description/canonical (alexcearnau.com)/robots/og/one h1/JSON-LD types on every route, sitemap (12 primary URLs) and primary robots all pass. Staging badge does not cover the logo (desktop and mobile). Breadcrumbs and related links are correct. Cookie banner: no storage before a choice, 3 buttons of equal size (130x46), toggles off except the locked necessary one, reject stores v1.1 with all optional false, footer Cookie Settings reopens the dialog, and on mobile the banner is gone after a choice. Cookie table and privacy policy content are present. Third-party hosts: only assets.emergent.sh and static.cloudflareinsights.com. Backend pytest: 50 passed, 7 skipped.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Project detail related block", "issues": ["The links 'View all sports social media projects' and 'Get in touch about a collaboration' are small text links that are hard to notice. Optional: give them more visual weight."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/staging_http_check.py", "/app/backend/tests/test_admin_auth.py", "/app/backend/tests/test_admin_live_csrf.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Clear the TOTP enrolment that was made during testing so the owner can enrol their own device (the secret is in /tmp/e2e_totp_secret).",
+    "Optional: see critical_code_review_comments (404 limiter scope and X-Forwarded-For spoofing)."
+  ],
+  "critical_code_review_comments": [
+    "setupProxy.js: after an IP has 30 404s, tooMany404() returns 429 for every HTML route, including valid 200 pages, for 10 minutes. If only 404s should be blocked, check the limit only on the 404 branch (or accept this deliberately).",
+    "setupProxy.js clientIp() takes the first X-Forwarded-For value. A client can set that value itself, so it can get around the 404 limiter. Use the address the trusted proxy appended instead (for example the right-most hop).",
+    "contact.py SenderIn.email is a plain str (3-254 chars). This is fine for admin use, but EmailStr would match the frontend validation.",
+    "list_messages caps the inbox at 500 with no pagination."
+  ],
+  "updated_files": ["/app/backend/tests/staging_http_check.py (new: staging HTTP/SEO regression script, run with python)"],
+  "success_rate": {"backend": "100% (pytest 50 passed/7 skipped; staging HTTP checks 48/48)", "frontend": "100%"},
+  "seed_data_creation": "Created one contact message from test_gdpr_<ts>@example.com and erased it with the GDPR erase feature. No other data was changed. The admin account is now TOTP-enrolled (secret in /tmp/e2e_totp_secret).",
+  "flaky_tests": ["Once, after opening Customize, pressing Escape and clicking Reject all, the banner reject button was still reported as visible. This could not be reproduced in 3 clean runs (the banner hid correctly each time), so it is probably a timing issue in the test script."],
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Admin is at <ADMIN_PATH>. Read the credentials from backend/.env inside the playwright script with open(); never print them. The TOTP secret is in /tmp/e2e_totp_secret (unless the main agent cleared the enrolment). Run python /app/backend/tests/staging_http_check.py for the 404/robots/SEO/sitemap checks. Each run uses about 7 of the 30 HTML 404s allowed per 10 minutes."
+}

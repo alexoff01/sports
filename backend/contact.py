@@ -94,7 +94,7 @@ def _iso(m: dict) -> dict:
 
 class SenderIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    email: str = Field(min_length=3, max_length=254)
+    email: EmailStr
 
 
 @router.post("/admin/messages/export")

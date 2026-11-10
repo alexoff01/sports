@@ -14,7 +14,7 @@
     "integration_issues": [],
     "design_issues": [
       {"screen": "Dashboard banner", "issues": ["The weak-password banner can be dismissed, but the dismissal is not persisted; it comes back on every reload or new login (state lives in component state only). Fine if intended."]},
-      {"screen": "Public /sitemap.xml and /robots.txt", "issues": ["They contain no admin path (good), but they hard-code the host https://studio-console-1--2pxbyqz1.preview.emergentagent.com instead of the current PUBLIC_BASE_URL (9ccb7fec-...). The static files are stale. This existed before the change; left untouched because public files must not change."]}
+      {"screen": "Public /sitemap.xml and /robots.txt", "issues": ["They contain no admin path (good), but they hard-code the host https://studio-console-1--2pxbyqz1.preview.emergentagent.com instead of the current PUBLIC_BASE_URL (<old-preview>). The static files are stale. This existed before the change; left untouched because public files must not change."]}
     ]
   },
   "test_report_links": ["/app/backend/tests/test_admin_auth.py", "/app/backend/tests/test_admin_live_csrf.py", "/app/test_reports/pytest/live_csrf.xml"],

@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 from config import ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, ALLOWED_ORIGINS, MESSAGE_RETENTION_DAYS, PRIMARY_HOST
 from datetime import timedelta
@@ -86,6 +87,21 @@ app.include_router(auth.router)
 app.include_router(contact.router)
 app.include_router(projects.router)
 app.include_router(seo.router)
+
+class SelectiveGZip:
+    """Compress JSON/XML/text API responses; never media (already compressed, and Range/206 must stay intact)."""
+
+    def __init__(self, app):
+        self.app = app
+        self.gzip = GZipMiddleware(app, minimum_size=1024)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and not scope["path"].startswith("/api/media"):
+            return await self.gzip(scope, receive, send)
+        return await self.app(scope, receive, send)
+
+
+app.add_middleware(SelectiveGZip)
 
 app.add_middleware(
     CORSMiddleware,

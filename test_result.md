@@ -56,7 +56,7 @@
 ##   test_all: false
 ##   test_priority: "high_first"  # or "sequential" or "stuck_first"
 ##
-##   - task: "Change request 5: domains (ALLOWED_ORIGINS, staging), /ac-studio admin path, SEO (prerender, setupProxy, /api/seo/*), GDPR (consent record, export/erase, policies)"
+##   - task: "Change request 5: domains (ALLOWED_ORIGINS, staging), <ADMIN_PATH> admin path, SEO (prerender, setupProxy, /api/seo/*), GDPR (consent record, export/erase, policies)"
     implemented: true
     working: "NA"
     file: "backend/config.py, backend/seo.py, backend/server.py, backend/contact.py, backend/auth.py, frontend/src/setupProxy.js, frontend/seo/inject.js, frontend/scripts/prerender.js, frontend/src/lib/api.js, frontend/src/lib/seo.js"

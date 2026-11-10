@@ -29,6 +29,10 @@ def clean_text(value: str) -> str:
 
 
 def client_ip(request: Request) -> str:
+    # Cloudflare overwrites CF-Connecting-IP, so clients cannot spoof it; fall back to X-Forwarded-For.
+    cf = request.headers.get("cf-connecting-ip")
+    if cf:
+        return cf.strip()
     xff = request.headers.get("x-forwarded-for")
     if xff:
         return xff.split(",")[0].strip()

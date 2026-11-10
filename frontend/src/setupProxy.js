@@ -24,7 +24,8 @@ const cached = async (key, ttl, load) => {
   return value;
 };
 
-const clientIp = (req) => String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+const clientIp = (req) =>
+  String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
 
 const tooMany404 = (ip) => {
   const now = Date.now();

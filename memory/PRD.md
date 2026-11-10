@@ -41,6 +41,14 @@ Build a complete, production-ready portfolio / business-card website for Alex Ce
 - Studio route recognised by SHA-256 digest only; no admin code/path in public bundle; source maps off
 - scripts/reset_admin_password.py (+ --reset-totp); backend/tests/test_admin_auth.py (30 tests)
 
+## Implemented (2026-11-10, change request 5: domains, short admin path, SEO, GDPR)
+- Login bug fixed (origin allowlist out of date after preview host change); specific login error messages
+- ALLOWED_ORIGINS (primary + staging), host-bound sessions, staging noindex/robots/label, HSTS on primary only, /api X-Robots-Tag
+- Short ADMIN_PATH with forbidden-name check; identical 404 for unknown/admin/retired paths; 404 rate limits (API + staging HTML)
+- /api/seo/page|routes|robots.txt|sitemap.xml; staging dev-server middleware (setupProxy.js); production prerender (scripts/prerender.js)
+- JSON-LD: WebSite, Person (Oradea/Bihor/RO, credential), ProfilePage, CollectionPage+ItemList, ContactPage, CreativeWork+BreadcrumbList
+- Breadcrumbs + related projects; GDPR: consent record, export/erase per sender, policies v2.0/1.1, retention env, security.txt, docs/GDPR.md, docs/SEO-CHECKLIST.md
+
 ## Backlog
 - P0: Fill TODO_CONFIRM items (socials, quote, legal details, production domain, portrait)
 - P1: Frontend CSP/HSTS headers at hosting layer; dependency audit; Lighthouse pass
