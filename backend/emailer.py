@@ -10,7 +10,10 @@ import httpx
 logger = logging.getLogger(__name__)
 
 RESEND_API_URL = "https://api.resend.com/emails"
-EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Website").strip()
+
+EMAIL_FROM_NAME = os.environ.get(
+    "EMAIL_FROM_NAME", "Website"
+).strip()
 
 _SHORTENERS = (
     "bit.ly",
@@ -88,7 +91,8 @@ class _EmailScan(HTMLParser):
 
         if tag.lower() == "a":
             self._href = dict(
-                (key.lower(), value) for key, value in attrs
+                (key.lower(), value)
+                for key, value in attrs
             ).get("href")
             self._text = []
 
@@ -111,7 +115,9 @@ def _assert_safe_email(subject: str, html: str) -> None:
     scan.close()
 
     if scan.tags & {"form", "input", "textarea", "select"}:
-        raise ValueError("No forms or input fields in email (G2)")
+        raise ValueError(
+            "No forms or input fields in email (G2)"
+        )
 
     body = f"{subject}\n{html}".lower()
 
@@ -148,33 +154,44 @@ def _assert_safe_email(subject: str, html: str) -> None:
 
         for match in _HOSTISH.finditer(text):
             if not _same_site(match.group(1).lower(), real):
-                raise ValueError("Anchor text host mismatch (G3)")
+                raise ValueError(
+                    "Anchor text host mismatch (G3)"
+                )
 
 
-async def send_email(*, to: str, subject: str, html: str) -> bool:
+async def send_email(
+    *,
+    to: str,
+    subject: str,
+    html: str
+) -> bool:
     """
-    Sends an email using Resend.
-    Returns True if Resend accepts the message.
+    Sends email through Resend API.
+    Returns True when Resend accepts the message.
     Never logs recipient, email content or API credentials.
     """
 
     try:
         _assert_safe_email(subject, html)
 
-        api_key = os.environ.get("RESEND_API_KEY", "").strip()
+        api_key = os.environ.get(
+            "RESEND_API_KEY", ""
+        ).strip()
+
         from_address = os.environ.get(
             "EMAIL_FROM_ADDRESS", ""
         ).strip()
-        from_name = os.environ.get(
-            "EMAIL_FROM_NAME", "Website"
-        ).strip()
 
         if not api_key:
-            logger.error("Email not configured: RESEND_API_KEY is missing")
+            logger.error(
+                "Email not configured: RESEND_API_KEY is missing"
+            )
             return False
 
         if not from_address:
-            logger.error("Email not configured: EMAIL_FROM_ADDRESS is missing")
+            logger.error(
+                "Email not configured: EMAIL_FROM_ADDRESS is missing"
+            )
             return False
 
         if not to or "\n" in to or "\r" in to:
@@ -184,7 +201,7 @@ async def send_email(*, to: str, subject: str, html: str) -> bool:
             raise ValueError("Invalid email subject")
 
         payload = {
-            "from": f"{from_name} <{from_address}>",
+            "from": f"{EMAIL_FROM_NAME} <{from_address}>",
             "to": [to],
             "subject": subject,
             "html": html,
@@ -205,7 +222,9 @@ async def send_email(*, to: str, subject: str, html: str) -> bool:
         if response.status_code not in (200, 201):
             try:
                 error_data = response.json()
-                error_code = error_data.get("name", "unknown_error")
+                error_code = error_data.get(
+                    "name", "unknown_error"
+                )
             except ValueError:
                 error_code = "unknown_error"
 
@@ -214,6 +233,7 @@ async def send_email(*, to: str, subject: str, html: str) -> bool:
                 response.status_code,
                 error_code,
             )
+
             return False
 
         return True
