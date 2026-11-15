@@ -14,7 +14,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-BACKEND = Path("/app/backend") if Path("/app/backend/passwords.py").is_file() else Path(__file__).resolve().parent.parent / "backend"
+BACKEND = Path("/app/backend")
 sys.path.insert(0, str(BACKEND))
 
 from dotenv import load_dotenv  # noqa: E402
