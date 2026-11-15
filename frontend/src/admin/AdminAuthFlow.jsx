@@ -107,7 +107,7 @@ export const AdminAuthFlow = ({ onAuthed, notice }) => {
   const submitLogin = (e) => {
     e.preventDefault();
     run(async () => {
-      const { data } = await api.post("/admin-auth/login", { email: email.trim(), password });
+      const { data } = await api.post("/api/admin-auth/login", { email: email.trim(), password });
       setPassword("");
       if (data.next === "done") onAuthed();
       else setStep(data.next);
