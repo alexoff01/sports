@@ -2,6 +2,8 @@ FROM node:20-bookworm-slim AS frontend-builder
 
 WORKDIR /frontend
 
+ARG REACT_APP_ADMIN_PATH_HASH
+
 ENV NODE_OPTIONS=--openssl-legacy-provider
 
 COPY frontend/ ./
