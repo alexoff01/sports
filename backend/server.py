@@ -6,6 +6,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
+from pathlib import Path
+from fastapi.responses import FileResponse
 
 from config import ADMIN_EMAIL, ADMIN_INITIAL_PASSWORD, ALLOWED_ORIGINS, MESSAGE_RETENTION_DAYS, PRIMARY_HOST
 from datetime import timedelta
@@ -154,6 +156,32 @@ async def startup():
         projects.init_storage()
     except Exception:  # noqa: BLE001
         logger.warning("Object storage init failed; uploads will retry on demand.")
+
+# Serve React frontend
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "build"
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_frontend(full_path: str):
+    from fastapi import HTTPException
+
+    if full_path == "api" or full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    root = FRONTEND_DIR.resolve()
+    requested_file = (root / full_path).resolve()
+
+    if requested_file != root and root not in requested_file.parents:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    if requested_file.is_file():
+        return FileResponse(requested_file)
+
+    index_file = root / "index.html"
+
+    if index_file.is_file():
+        return FileResponse(index_file)
+
+    raise HTTPException(status_code=500, detail="Frontend build not found")
 
 
 @app.on_event("shutdown")
