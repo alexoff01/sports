@@ -8,7 +8,7 @@ const here = typeof window !== "undefined" ? window.location.origin : "";
 const BASE = here || process.env.REACT_APP_BACKEND_URL || "";
 
 export const api = axios.create({
-  baseURL: BASE ? `${BASE}/api` : undefined,
+  baseURL: "/api",
   withCredentials: true,
   timeout: 30000,
 });
