@@ -10,6 +10,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 RESEND_API_URL = "https://api.resend.com/emails"
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Website").strip()
 
 _SHORTENERS = (
     "bit.ly",
