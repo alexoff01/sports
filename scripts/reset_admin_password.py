@@ -38,10 +38,12 @@ def main() -> int:
         print("No admin account found for ADMIN_EMAIL. Start the backend once to seed it.", file=sys.stderr)
         return 1
 
-    password = getpass.getpass("New admin password: ")
-    if getpass.getpass("Repeat new password: ") != password:
-        print("The passwords do not match. Nothing changed.", file=sys.stderr)
-        return 1
+    password = os.environ.get("ADMIN_NEW_PASSWORD")
+    if not password:
+        password = getpass.getpass("New admin password: ")
+        if getpass.getpass("Repeat new password: ") != password:
+            print("The passwords do not match. Nothing changed.", file=sys.stderr)
+            return 1
     problem = policy_error(password, email)
     if problem:
         print(problem + " Nothing changed.", file=sys.stderr)
