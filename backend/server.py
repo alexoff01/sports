@@ -31,7 +31,7 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()",
     "Cross-Origin-Opener-Policy": "same-origin",
-    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://assets.emergent.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https: wss:; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
 }
 NOT_FOUND_LIMIT = 60  # 404s per IP per 10 minutes before every /api request is refused
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
