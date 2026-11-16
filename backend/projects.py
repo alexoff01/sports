@@ -1,256 +1,192 @@
-321
-322
-323
-324
-325
-326
-327
-328
-329
-330
-331
-332
-333
-334
-335
-336
-337
-338
-339
-340
-341
-342
-343
-344
-345
-346
-347
-348
-349
-350
-351
-352
-353
-354
-355
-356
-357
-358
-359
-360
-361
-362
-363
-364
-365
-366
-367
-368
-369
-370
-371
-372
-373
-374
-375
-376
-377
-378
-379
-380
-381
-382
-383
-384
-385
-386
-387
-388
-389
-390
-391
-392
-393
-394
-395
-396
-397
-398
-399
-400
-401
-402
-403
-404
-405
-406
-407
-408
-409
-410
-411
-412
-413
-414
-415
-416
-417
-418
-419
-420
-421
-422
-423
-424
-425
-426
-427
-428
-429
-430
-431
-432
-433
-434
-435
-436
-437
-438
-439
-440
-441
-442
-443
-444
-445
-446
-447
-448
-    if not session or not re.fullmatch(r"[a-f0-9-]{36}", upload_id):
-        raise HTTPException(status_code=404, detail="Upload not found or expired.")
-    if index != session["next_index"]:
-        raise HTTPException(status_code=409, detail="Chunks must be sent in order.")
-    declared = int(request.headers.get("content-length") or 0)
-    if declared > CHUNK_SIZE:
-        raise HTTPException(status_code=413, detail="Chunk too large.")
-    data = await request.body()
-    if not data or len(data) > CHUNK_SIZE or session["received"] + len(data) > session["size"]:
-        raise HTTPException(status_code=413, detail="File too large (max 100 MB).")
-    if index == 0 and not _sniff_video(data[:64]):
-        raise HTTPException(status_code=415, detail="Only MP4 or WebM videos are allowed.")
-    with _upload_file(upload_id).open("ab") as fh:
-        fh.write(data)
-    await db.upload_sessions.update_one({"id": upload_id}, {"$inc": {"next_index": 1, "received": len(data)}})
-    return {"received": session["received"] + len(data)}
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+import asyncio
+import io
+import os
+import re
+import shutil
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Literal
+
+import boto3
+from botocore.config import Config
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
+from PIL import Image, ImageOps
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from auth import AdminContext, require_admin
+from core import clean_text, db, now
+
+router = APIRouter(prefix="/api")
+
+Category = Literal["Content Creation", "Strategy", "Video"]
+ProjectType = Literal["Concept", "Personal", "Real"]
+Platform = Literal["Instagram", "TikTok", "YouTube Shorts", "X"]
+MEDIA_RE = r"/api/media/[a-f0-9-]{36}"
+IMAGE_PATTERN = rf"^(/images/[a-z0-9-]+\.webp|{MEDIA_RE})$"
+VIDEO_PATTERN = rf"^{MEDIA_RE}$"
+MAX_IMAGE = 10 * 1024 * 1024
+MAX_VIDEO = 100 * 1024 * 1024
+CHUNK_SIZE = 5 * 1024 * 1024
+MAX_PIXELS = 50_000_000
+UPLOAD_DIR = Path(tempfile.gettempdir()) / "portfolio-uploads"
+CACHE_DIR = Path(tempfile.gettempdir()) / "portfolio-media-cache"
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+
+# Railway Bucket or any S3-compatible object storage.
+# Configure these five values in the Railway application service.
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "").strip()
+S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL", "").strip()
+S3_ACCESS_KEY_ID = os.getenv("S3_ACCESS_KEY_ID", "").strip()
+S3_SECRET_ACCESS_KEY = os.getenv("S3_SECRET_ACCESS_KEY", "").strip()
+S3_REGION = os.getenv("S3_REGION", "auto").strip() or "auto"
+_s3_client = None
 
 
-@router.post("/admin/uploads/video/{upload_id}/complete", status_code=201)
-async def video_complete(upload_id: str, _: AdminContext = Depends(require_admin)):
-    session = await db.upload_sessions.find_one({"id": upload_id})
-    part = _upload_file(upload_id)
-    if not session or not part.exists():
-        raise HTTPException(status_code=404, detail="Upload not found or expired.")
-    try:
-        if session["received"] != session["size"] or part.stat().st_size != session["size"]:
-            raise HTTPException(status_code=400, detail="Upload incomplete. Please try again.")
-        with part.open("rb") as fh:
-            kind = _sniff_video(fh.read(64))
-        if not kind:
-            raise HTTPException(status_code=415, detail="Only MP4 or WebM videos are allowed.")
-        content_type = f"video/{kind}"
-        media_id = str(uuid.uuid4())
-
-        def _store() -> str:
-            with part.open("rb") as fh:
-                return _put(f"portfolio/media/{media_id}.{kind}", fh, content_type)
-
-        path = await asyncio.to_thread(_store)
-        await db.media.insert_one({"id": media_id, "kind": "video", "path": path, "content_type": content_type,
-                                   "size": session["size"], "created_at": now()})
-        return {"url": f"/api/media/{media_id}", "content_type": content_type}
-    finally:
-        part.unlink(missing_ok=True)
-        await db.upload_sessions.delete_one({"id": upload_id})
+def init_storage(force: bool = False):
+    """Return a reusable S3 client; fail clearly if configuration is missing."""
+    global _s3_client
+    if _s3_client is not None and not force:
+        return _s3_client
+    missing = [name for name, value in (
+        ("S3_BUCKET_NAME", S3_BUCKET_NAME),
+        ("S3_ENDPOINT_URL", S3_ENDPOINT_URL),
+        ("S3_ACCESS_KEY_ID", S3_ACCESS_KEY_ID),
+        ("S3_SECRET_ACCESS_KEY", S3_SECRET_ACCESS_KEY),
+    ) if not value]
+    if missing:
+        raise RuntimeError("S3 storage not configured: " + ", ".join(missing))
+    _s3_client = boto3.client(
+        "s3",
+        endpoint_url=S3_ENDPOINT_URL,
+        aws_access_key_id=S3_ACCESS_KEY_ID,
+        aws_secret_access_key=S3_SECRET_ACCESS_KEY,
+        region_name=S3_REGION,
+        config=Config(signature_version="s3v4", retries={"max_attempts": 3, "mode": "standard"}),
+    )
+    return _s3_client
 
 
-# ---------------------------------------------------------------- media library
-async def _in_use(url: str) -> bool:
-    return bool(await db.projects.find_one({"$or": [{"cover_image": url}, {"gallery": url}, {"videos": url}]}, {"_id": 1}))
-
-
-@router.get("/admin/media")
-async def media_list(_: AdminContext = Depends(require_admin)):
-    items = await db.media.find({"deleted": {"$ne": True}}, {"_id": 0, "path": 0, "variants": 0, "deleted": 0}).sort("created_at", -1).to_list(1000)
-    for m in items:
-        m["url"] = f"/api/media/{m['id']}"
-        m["kind"] = m.get("kind", "image")
-        m["in_use"] = await _in_use(m["url"])
-        _iso(m)
-    return items
-
-
-@router.delete("/admin/media/{media_id}")
-async def media_delete(media_id: str, _: AdminContext = Depends(require_admin)):
-    url = f"/api/media/{media_id}"
-    if await _in_use(url):
-        raise HTTPException(status_code=409, detail="This file is used by a project. Remove it from the project first.")
-    res = await db.media.update_one({"id": media_id, "deleted": {"$ne": True}}, {"$set": {"deleted": True, "deleted_at": now()}})
-    if not res.modified_count:
-        raise HTTPException(status_code=404, detail="Not found.")
-    for cached in CACHE_DIR.glob(f"{media_id}.*"):
-        cached.unlink(missing_ok=True)
-    return {"ok": True}
-
-
-# ---------------------------------------------------------------- media delivery
-async def _cached(record: dict, path: str, ext: str) -> Path:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    target = CACHE_DIR / f"{record['id']}.{ext}"
-    if not target.exists():
-        data = await asyncio.to_thread(_get, path)
-        tmp = target.with_suffix(".tmp" + uuid.uuid4().hex[:6])
-        tmp.write_bytes(data)
-        shutil.move(tmp, target)
-    return target
-
-
-def _range(header: str | None, size: int) -> tuple[int, int] | None:
-    m = re.fullmatch(r"bytes=(\d*)-(\d*)", (header or "").strip())
-    if not m or (not m.group(1) and not m.group(2)):
-        return None
-    if m.group(1):
-        start, end = int(m.group(1)), int(m.group(2)) if m.group(2) else size - 1
+def _put(path: str, data, content_type: str) -> str:
+    """Upload bytes or a binary file handle; retain the existing MongoDB path format."""
+    client = init_storage()
+    if hasattr(data, "read"):
+        client.upload_fileobj(data, S3_BUCKET_NAME, path, ExtraArgs={"ContentType": content_type})
     else:
-        start, end = max(0, size - int(m.group(2))), size - 1
-    end = min(end, size - 1)
-    return (start, end) if start <= end else None
+        client.put_object(Bucket=S3_BUCKET_NAME, Key=path, Body=data, ContentType=content_type)
+    return path
 
 
-@router.get("/media/{media_id}")
-async def media(media_id: str, request: Request):
-    record = await db.media.find_one({"id": media_id, "deleted": {"$ne": True}}, {"_id": 0})
-    if not record:
-        raise HTTPException(status_code=404, detail="Not found.")
-    url = f"/api/media/{media_id}"
-    public = await db.projects.find_one({"published": True, "$or": [{"cover_image": url}, {"gallery": url}, {"videos": url}]}, {"_id": 1})
-    if not public:
-        await require_admin(request)
-    headers = {"Cache-Control": "public, max-age=86400" if public else "private, no-store", "X-Content-Type-Options": "nosniff",
-               "Cross-Origin-Resource-Policy": "same-site"}
-    if record.get("kind") == "video":
-        ctype = record["content_type"]
-        file = await _cached(record, record["path"], ctype.split("/")[1])
-        size = file.stat().st_size
-        headers |= {"Accept-Ranges": "bytes", "Content-Disposition": f'inline; filename="{media_id}.{ctype.split("/")[1]}"'}
-        rng = _range(request.headers.get("range"), size)
-        if request.headers.get("range") and not rng:
-            return Response(status_code=416, headers={**headers, "Content-Range": f"bytes */{size}"})
-        start, end = rng or (0, size - 1)
-        with file.open("rb") as fh:
-            fh.seek(start)
-            chunk = fh.read(end - start + 1)
-        if rng:
-            headers["Content-Range"] = f"bytes {start}-{end}/{size}"
-        return Response(content=chunk, status_code=206 if rng else 200, media_type=ctype, headers=headers)
-    variants = record.get("variants") or {"image/webp": record["path"]}
-    ctype = "image/avif" if "image/avif" in (request.headers.get("accept") or "") and "image/avif" in variants else "image/webp"
+def _get(path: str) -> bytes:
+    response = init_storage().get_object(Bucket=S3_BUCKET_NAME, Key=path)
+    try:
+        return response["Body"].read()
+    finally:
+        response["Body"].close()
+
+
+# ---------------------------------------------------------------- models
+class Caption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    platform: Platform
+    text: str = Field(min_length=2, max_length=600)
+
+
+class ProjectIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
